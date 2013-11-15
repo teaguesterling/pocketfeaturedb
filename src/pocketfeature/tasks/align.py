@@ -18,7 +18,7 @@ def align_scores_munkres(scores, cutoff):
 def align_scores_greedy(scores, cutoff):
     filtered_scores = ((k, v) for k, v in scores.items() if v <= cutoff)
     filtered = MatrixValues(filtered_scores)
-    aligned = greedy_align(filtered)
+    aligned = MatrixValues(greedy_align(filtered))
     return aligned
 
 

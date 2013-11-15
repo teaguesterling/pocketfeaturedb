@@ -2,7 +2,7 @@
 
 from feature.io.pointfile import PDBPoint
 
-from pocketfeature.ff_utils import (
+from pocketfeature.utils.ff import (
     residue_code_three_to_one,
     residue_to_typecode,
 )

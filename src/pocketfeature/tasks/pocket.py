@@ -8,7 +8,7 @@ from feature.io import pointfile
 
 from pocketfeature.io import pdbfile
 from pocketfeature.io import residuefile
-from pocketfeature.pdb_utils import (
+from pocketfeature.utils.pdb import (
     find_residues_by_id,
     is_het_residue,
     list_ligands,
@@ -88,7 +88,7 @@ def main(args, stdout, stderr):
     lig_name = args[1] if len(args) > 1 else None
     cutoff = float(args[args.index('-c') + 1]) if '-c' in args else 6.0
     print_residues = '-r' in args
-    structure = pdbfile.open(pdb_path)
+    structure = pdbfile.open_file(pdb_path)
     if lig_name is None:
         ligands = list_ligands(structure)
         residuefile.dump(ligands, stdout)

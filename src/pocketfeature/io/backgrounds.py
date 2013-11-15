@@ -6,7 +6,7 @@ from feature.properties import (
     ItemNameList,
     PropertyList, 
 )
-from pocketfeature.ff_utils import (
+from pocketfeature.utils.ff import (
     has_vector,
     get_vector,
     get_vector_type,

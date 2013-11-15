@@ -6,7 +6,7 @@ import itertools
 
 from feature.io import featurefile
 from pocketfeature.algorithms import Indexer
-from pocketfeature.ff_utils import (
+from pocketfeature.utils.ff import (
     get_vector_description,
     vectors_descriptions_in_file,
 )

@@ -3,7 +3,6 @@ from Bio.PDB.PDBParser import PDBParser
 import gzip
 import os
 
-raw_open = open
 
 class PDBFocus(object):
     """ Provides a consistent interface for looking at a specific model or
@@ -110,6 +109,7 @@ class PDBReader(object):
     @classmethod
     def fromFile(cls, path, pdbid=None):
         pdbid = cls.pdbIdFromFilename(path) if pdbid is None else pdbid
+        opener = gzip.open if path.endswith('.gz') else open
         with gzip.open(path) as f:
             return cls.fromStream(f, pdbid)
 
@@ -117,5 +117,5 @@ class PDBReader(object):
 def load(io, pdbid):
     return PDBReader.fromStream(io, pdbid)
 
-def open(path, mode='r', pdbid=None):
+def open_file(path, mode='r', pdbid=None):
     return PDBReader.fromFile(path, pdbid=pdbid)

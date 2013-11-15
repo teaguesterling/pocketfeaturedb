@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # This module needs some cleanup
 
-from pdb_utils import (
+from pocketfeature.utils.pdb import (
     atom_name, 
     average_coords,
     residue_name, 
