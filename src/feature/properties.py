@@ -55,6 +55,9 @@ class ItemNameList(list):
 class PropertyList(ItemNameList):
     """ Container to store lists of parameters used in FEATURE calcuations """
 
+    def get_features(self, shells):
+        return ["{0}_{1}".format(name, shell) for shell in range(shells) for name in self]
+
     def dtype(self):
         """ Construct a numpy dtype for this property list """
         #definition = [(prop, property_dtype(prop)) for prop in self]

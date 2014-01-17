@@ -2,6 +2,7 @@
 from __future__ import print_function
 
 from cStringIO import StringIO
+import re
 
 import numpy as np
 
@@ -23,8 +24,6 @@ from feature.properties import (
 class PropertyMismatchError(Exception):
     pass
 
-
-FEATURE_LINE = "{0}\t{1}"
 
 COORDINANTS = 'COORDINANTS'
 DESCRIPTION = 'DESCRIPTION'
@@ -302,15 +301,15 @@ def dumps(data):
 def extract_line_components(line):
     """ Spilt the main components (name, features, comments)
         up in a FEATURE file vector line """
-    data_comments = line.split("#", 1)
-    if len(data_comments) == 0:
-        return None
-    name, data = data_comments[0].split("\t", 1)
-    features = data.strip().split("\t")
-    if len(data_comments) > 1:
-        comments = data_comments[1].split("#")
-    else:
+    tokens = line.split("\t")
+    try:
+        comments_idx = tokens.index("#")
+        print(comments_idx)
+        return
+        comments = [token for token in tokens[comments_idx:] if token != '#']
+    except IndexError:
         comments = []
+    name, features = tokens[0], tokens[1:]
     return name, features, comments
 
 

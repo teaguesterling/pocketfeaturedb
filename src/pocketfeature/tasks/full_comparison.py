@@ -2,6 +2,7 @@
 from __future__ import print_function
 
 import logging
+import os
 
 from feature.backends.wrappers import featurize_points
 
@@ -54,7 +55,8 @@ def main(args, stdout, stderr):
     """
     This is just a simple usage example. Fancy argument parsing needs to be enabled
     """
-    if len(args) < 4:
+    print(len(args))
+    if len(args) in (0, 1, 3):
         print("Usage: ", file=stderr)
 
         print(" compare_features.py PDB1 LIG1 PDB2 LIG2 [BG_VECS [BG_NORMS]] [-m]", file=stderr)
@@ -67,12 +69,22 @@ def main(args, stdout, stderr):
     log = logging.getLogger('pocketfeature')
     log.setLevel(logging.DEBUG)
     
-    pdb_path1 = args[0]
-    lig_id1 = args[1]
-    pdb_path2 = args[2]
-    lig_id2 = args[3]
-    bg_vecs = args[4] if len(args) > 2 else 'background.ff'
-    bg_norms = args[5] if len(args) > 3 else 'background.coeffs'
+    if len(args) == 2:
+        lig_id1 = args[0]
+        lig_id2 = args[1]
+        pdb_id1 = lig_id1.split('/')[0]
+        pdb_id2 = lig_id2.split('/')[0]
+        pdb_path1 = os.path.join(os.environ.get('PDB_DIR', '.'), "{0}.pdb.gz".format(pdb_id1))
+        pdb_path2 = os.path.join(os.environ.get('PDB_DIR', '.'), "{0}.pdb.gz".format(pdb_id2))
+        bg_pos = 2
+    else:
+        pdb_path1 = args[0]
+        lig_id1 = args[1]
+        pdb_path2 = args[2]
+        lig_id2 = args[3]
+        bg_pos = 4
+    bg_vecs = args[bg_pos] if len(args) > 4 else 'background.ff'
+    bg_norms = args[bg_pos+1] if len(args) > 5 else 'background.coeffs'
     munkres = '-m' in args
 
     if munkres:
