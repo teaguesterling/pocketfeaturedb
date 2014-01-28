@@ -28,10 +28,13 @@ Installation
 
  0. Install Python 2.7 (If needed)
  1. Install FEATUREwrappers (Dependencies will be installed)
+
         $ cd FEATUREwrappers
         $ python setup.py install
         $ cd ..
+
  2. Install PocketFEATURE (Dependencies will be installed)
+
         $ cd PocketFEATURE
         $ python setup.py install
         $ cd ..
