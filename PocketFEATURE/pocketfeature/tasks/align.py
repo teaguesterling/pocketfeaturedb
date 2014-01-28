@@ -7,6 +7,7 @@ from pocketfeature.algorithms import (
 )
 from pocketfeature.io.matrixvaluesfile import MatrixValues
 
+from pocketfeature.tasks.core import Task
 
 def align_scores_munkres(scores, cutoff):
     score_matrix = scores.to_array()
@@ -22,32 +23,59 @@ def align_scores_greedy(scores, cutoff):
     return aligned
 
 
-def main(args, stdout, stderr):
-    """
-    This is just a simple usage example. Fancy argument parsing needs to be enabled
-    """
-    if len(args) == 0:
-        print("Usage: ", file=stderr)
-        print(" find_pocket.py SCORES [-c CUTOFF] [-m]", file=stderr)
-        print("      -c CUTOFF  - Score Cutoff [default: -0.15]", file=stderr)
-        print("      -m         - Munkres Align (Proof of concept)", file=stderr)
-        return -1
-    
-    scores = args[0]
-    cutoff = float(args[args.index('-c') + 1]) if '-c' in args else 6.0
-    munkres = '-m' in args
-    
-    if munkres:
-        align_method = align_scores_munkres
-    else:
-        align_method = align_scores_greed
+class AlignScores(Task):
+    DEFAULT_CUTOFF = -0.15
+    DEFAULT_COLUMN = 1  # Normalized in 2nd column
+    ALIGNMENT_METHODS = {
+        'greedy': align_scores_greedy,
+        'munkres': align_scores_munkres,
+    }
 
-    with open(scores_path) as score_f:
-        scores = matrixvaluesfile.load(score_f, columns=[1], cast=float)
-    aligned = align_scores_greedy(scores, cutoff)
-    matrixvaluesfile.dump(aligned, stdout)
+    def run(self):
+        params = self.params
+        align = params.method
+        columns = [params.score_column]
+        scores = matrixvaluesfile.load(params.scores, columns=columns, cast=float)
+        alignment = align(scores)
+        matrixvaluesfile.dump(alignment, params.output)
+        return 0
+
+    @classmethod
+    def arguments(cls, stdin, stdout, stderr, environ, task_name):
+        from argparse import ArgumentParser
+        from pocketfeature.utils.args import (
+            decompress,
+            FileType,
+        )
+        parser = ArgumentParser("Align scores from a PocketFEATURE score matrix")
+        parser.add_argument('scores', metavar='SCOREFILE', 
+                                      type=FileType.compressed('r'),
+                                      default=decompress(stdin),
+                                      help='Path to score file [default: STDIN]')
+        parser.add_argument('-c', '--cutoff', metavar='CUTOFF',
+                                              type=float,
+                                              default=cls.DEFAULT_CUTOFF,
+                                              help='Minium score (cutoff) to align [default: %(default)s')
+        parser.add_argument('-s', '--score-column', metavar='COLINDEX',
+                                                    type=int,
+                                                    default=cls.DEFAULT_COLUMN,
+                                                    help='Value column index in score file to use for aligning [default: 1]')
+        parser.add_argument('-m', '--method', metavar='ALIGN_METHOD',
+                                      choices=cls.ALIGNMENT_METHODS,
+                                      default='greedy',
+                                      help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
+        parser.add_argument('-o', '--output', metavar='VALUES',
+                                              type=FileType.compressed('w'),
+                                              default=stdout,
+                                              help='Path to output file [default: STDOUT]')
+        parser.add_argument('--log', metavar='LOG',
+                                     type=FileType,
+                                     default=stderr,
+                                     help='Path to log errors [default: STDERR]')
+        return parser
+
 
 if __name__ == '__main__':
     import sys
-    sys.exit(main(sys.argv[1:], sys.stdout, sys.stderr))
+    sys.exit(AlignScore.run_as_script())
 

@@ -18,7 +18,7 @@ def _parse_entry(line, dims=2, delimiter=None):
 
 def _get_value_columns(values, accepted, cast):
     if accepted is not None:
-        values = [item for i, item in enumerate(values) if i in accepted]
+        values = [values[idx] for idx in accepted]
     if len(values) == 0:
         return 1, None
     elif len(values) == 1:
@@ -31,7 +31,7 @@ def _get_value_columns(values, accepted, cast):
 def load(io, dims=2, delimiter=None, columns=None, cast=None, make_key=tuple):
     positions = []
     indexes = [Indexer() for i in range(dims)]
-    columns = set(columns) if columns is not None else None
+    columns = list(columns) if columns is not None else None
     cast = cast if cast is not None else lambda x: x
     value_count = 0
     for entry in io:

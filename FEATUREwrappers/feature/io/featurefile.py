@@ -301,16 +301,11 @@ def dumps(data):
 def extract_line_components(line):
     """ Spilt the main components (name, features, comments)
         up in a FEATURE file vector line """
-    tokens = line.split("\t")
-    try:
-        comments_idx = tokens.index("#")
-        print(comments_idx)
-        return
-        comments = [token for token in tokens[comments_idx:] if token != '#']
-    except IndexError:
-        comments = []
+    parts = line.split("#")
+    tokens = parts[0].strip().split("\t")
+    comments = parts[1:]
     name, features = tokens[0], tokens[1:]
-    return name, features, comments
+    return name, features, [c.strip() for c in comments]
 
 
 def _load_vectors_using_metadata(metadata, lines):

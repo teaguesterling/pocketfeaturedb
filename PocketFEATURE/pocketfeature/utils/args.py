@@ -25,7 +25,6 @@ class FileType(argparse.FileType):
                        opener=open,
                        wrapper=None, 
                        extraargs=None):
-        print("INIT")
         super(FileType, self).__init__(mode=mode)
         if extraargs is None:
             extraargs = {}
@@ -34,10 +33,8 @@ class FileType(argparse.FileType):
         self._wrapper = wrapper
         self._opener = opener
         self._extraargs = extraargs
-        print("DONE")
 
     def __call__(self, string):
-        print ("CALL")
         if string == '-':
             stream = super(FileType, self).__call__(string)
         try:
@@ -46,7 +43,7 @@ class FileType(argparse.FileType):
             message = _("can't open '%s': %s")
             raise ArgumentTypeError(message % (string, e))
         wrapped = self._wrapper(stream)
-        return wrapper
+        return wrapped
 
     @classmethod
     def compressed(cls, mode='r'):

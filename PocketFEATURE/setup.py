@@ -26,6 +26,10 @@ setup(name='PocketFEATURE',
       entry_points={
         'console_scripts': [
             pf_task_script('pocket:PocketFinder', 'pf_extract'),
+            pf_task_script('compare:FeatureFileCompare', 'pf_compare'),
+            pf_task_script('align:AlignScores', 'pf_align'),
+            pf_task_script('featurize:Featurize', 'pf_featurize'),
+            pf_task_script('full_comparison:ComparePockets', 'run_pf'),
         ]
       }
 )

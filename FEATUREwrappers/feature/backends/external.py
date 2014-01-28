@@ -65,7 +65,11 @@ default_environ.update({
       -o OUTFILE: DSSP
     Ex: -i /db/pdb/1qhx.pdb -o /db/dssp/1qrx.dssp
 """
-raw_dssp = sh.Command(DSSP_BIN)
+try:
+    raw_dssp = sh.Command(DSSP_BIN)
+except sh.CommandNotFound:
+    def raw_dssp(*args, **kwargs):
+        raise NotImplementedError("DSSP not available")
 
 
 """:
@@ -127,15 +131,15 @@ def generate_dssp_file(pdb_file, dssp_file=None,
 
 
 def featurize(shells=None,
-               width=None,
-               exclude=None,
-               properties=None,
-               search_in=None,
-               working_dir=None,
-               environ=None,
-               with_errors=False,
-               *exec_args,
-               **exec_params):
+              width=None,
+              exclude=None,
+              properties=None,
+              search_in=None,
+              working_dir=None,
+              environ=None,
+              with_errors=False,
+              *exec_args,
+              **exec_params):
     """ A base function for running featurize
 
         Optional Parameters:
@@ -175,7 +179,8 @@ def featurize(shells=None,
         errors.close()
         return results, errors_log
     else:
-        exec_params['_err'] = os.devnull
+        if '_err' not in exec_params:
+            exec_params['_err'] = os.devnull
         results = raw_featurize(*exec_args, **exec_params)
         return results
 

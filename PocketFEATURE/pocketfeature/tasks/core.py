@@ -15,7 +15,7 @@ class Task(object):
         try:
             self.log = params.log
         except AttributeError:
-            self.log = sys.log
+            self.log = sys.stdout
 
     @classmethod
     def task_name(cls):

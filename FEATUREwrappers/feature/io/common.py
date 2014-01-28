@@ -9,33 +9,27 @@ GZIP_MAGIC = "\x1f\x8b"
 
 def decompress(stream):
     try:
-        print "Checking"
         checked = BufferedReader(stream)
         magic = checked.peek(2)
     except AttributeError as e:
-        print "Check Failed " + str(e)
         checked = stream
         magic = None
 
     if magic == GZIP_MAGIC:
-        print "GZIP"
         decompressed = gzip.GzipFile(fileobj=checked)
     # TODO: Other compression methods
     else:
-        print "STD"
         decompressed = checked
     return decompressed
 
 
 def open_compressed(path, mode='r', **options):
     if path.endswith('.gz'):
-        print "GZIP"
         # Must open gzipped files in binary
         if not mode.endswith('b'):
             mode += 'b'
         return gzip.open(path, mode=mode, **options)
     else:
-        print "STD"
         return open(path, mode=mode, **options)
 
 

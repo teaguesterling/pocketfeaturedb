@@ -82,6 +82,8 @@ def pick_best_ligand(structure):
 
 
 class PocketFinder(Task):
+    LIGAND_RESIDUE_DISTANCE = 6.0
+
     def run(self):
         params = self.params
         if params.pdbid is None:
@@ -103,7 +105,7 @@ class PocketFinder(Task):
             print("Error: Could not find ligand in structure", file=params.log)
             return -1
 
-        pocket = create_pocket_around_ligand(structure, ligand, cutoff=params.cutoff)
+        pocket = create_pocket_around_ligand(structure, ligand, cutoff=params.distance)
 
         if params.print_residues:
             residuefile.dump(pocket.residues, params.output)
@@ -114,10 +116,7 @@ class PocketFinder(Task):
 
     @classmethod
     def arguments(cls, stdin, stdout, stderr, environ, task_name):
-        from argparse import (
-            ArgumentParser,
-            FileType,
-        )
+        from argparse import ArgumentParser
         from pocketfeature.utils.args import (
             decompress,
             FileType,
@@ -127,7 +126,7 @@ class PocketFinder(Task):
                                    type=FileType.compressed('r'),
                                    nargs='?',
                                    default=decompress(stdin),
-                                   help='Path to PDB file [default: %(default)s]')
+                                   help='Path to PDB file [default: STDIN]')
         parser.add_argument('ligand', metavar='LIG',
                                       type=str,
                                       nargs='?',
@@ -140,14 +139,14 @@ class PocketFinder(Task):
         parser.add_argument('-o', '--output', metavar='PTF',
                                               type=FileType.compressed('w'),
                                               default=stdout,
-                                              help='Path to output file [default: %(default)s]')
+                                              help='Path to output file [default: STDOUT]')
         parser.add_argument('--log', metavar='LOG',
                                      type=FileType,
                                      default=stderr,
                                      help='Path to log errors [default: %(default)s]')
-        parser.add_argument('-c', '--cutoff', metavar='CUTOFF',
+        parser.add_argument('-d', '--distance', metavar='CUTOFF',
                                               type=float,
-                                              default=6.0,
+                                              default=cls.LIGAND_RESIDUE_DISTANCE,
                                               help='Residue active site distance threshold [default: %(default)s]')
         parser.add_argument('-p', '--print-pointfile', action='store_true',
                                                        default=True,
