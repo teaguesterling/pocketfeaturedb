@@ -92,7 +92,11 @@ except sh.CommandNotFound:
             Read point list from POINTFILE
         -H  Print header
 """
-raw_featurize = sh.Command(FEATURIZE_BIN)
+try:
+    raw_featurize = sh.Command(FEATURIZE_BIN)
+except sh.CommandNotFound:
+    def raw_featurize(*args, **kwargs):
+        raise NotImplementedError("FEATURE not available. Try setting FEATURE_ROOT or FEATURE_BIN")
 
 
 def generate_dssp_file(pdb_file, dssp_file=None,

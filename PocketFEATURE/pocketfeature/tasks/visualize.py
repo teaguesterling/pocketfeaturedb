@@ -12,11 +12,20 @@ from pocketfeature.io import residuefile
 
 from pocketfeature.tasks.core import Task
 
+
+HEADER = """
+from pymol.cgo import *
+from pymol import cmd
+pocket = [
+"""
+
+FOOTER = """
+]
+cmd.load({0})
+cmd.load_cgo(pocket, 'pocket')
+"""
+
 def create_command(pdb, points, radii, colors):
-    header = """
-    from pymol.cgo import *
-    from pymol import cmd
-    pocket = ["""
     lines = []
     for point, radius, color in zip(points, radii, colors):
         lines.append("    COLOR, {0:.3f}, {1:.3f}, {2:.3f},".format(*color))
@@ -24,18 +33,45 @@ def create_command(pdb, points, radii, colors):
                                                             point.y, 
                                                             point.z, 
                                                             radius))
-    footer = """
-    ]
-    
-    cmd.load({0})
-    cmd.load_cgo(pocket, 'pocket')
-    """.format(repr(pdb))
+    footer = FOOTER.format(repr(pdb))
 
-    return header + "\n" + "\n".join(lines) + footer
+    return HEADER + "\n".join(lines) + footer
 
 
 def get_point_name(point):
     return point.comment.split()[0]
+
+
+def create_visualizations(pointsA, pointsB, alignment, pdbA=None, 
+                                                       pdbB=None,
+                                                       colors=None,
+                                                       radii=None):
+        pointsA = list(pointsA)
+        pointsB = list(pointsB)
+        pointMapA = {get_point_name(p): p for p in pointsA}
+        pointMapB = {get_point_name(p): p for p in pointsB}
+
+        if radii is None:
+            scores = alignment.values()
+            minScore, maxScore = min(scores), max(scores)
+            radii = [score/(maxScore) for score in scores]
+        else:
+            radii = list(radii)
+
+        if colors is None:
+            colors = [(random.random(),
+                       random.random(),
+                       random.random()) for _ in scores]
+        else:
+            colors = list(colors)
+        
+        pdbA = "{0}.pdb".format(pointsA[0].pdbid) if pdbA is None else pdbA
+        pdbB = "{0}.pdb".format(pointsB[0].pdbid) if pdbA is None else pdbB
+        
+        scriptA = create_command(pdbA, pointsA, radii, colors)
+        scriptB = create_command(pdbA, pointsB, radii, colors)
+
+        return scriptA, scriptB 
 
 
 class VisAlign(Task):
@@ -49,39 +85,35 @@ class VisAlign(Task):
         pointsA = pointfile.load(params.pointsA)
         pointsB = pointfile.load(params.pointsB)
         alignment = matrixvaluesfile.load(params.alignment, cast=float)
-        pointMapA = {get_point_name(p): p for p in pointsA}
-        pointMapB = {get_point_name(p): p for p in pointsB}
 
-        scores = alignment.values()
-        minScore, maxScore = min(scores), max(scores)
-        radii = [(minScore+score)/maxScore for score in scores]
-        colors = [(random.random(),
-                   random.random(),
-                   random.random()) for _ in scores]
-        
-        if params.pdbA is None:
-            pdbA = "{0}.pdb".format(pointsA[0].pdbid)
+        if params.colors is not None:
+            colors = [map(float, l.split()) for l in params.colors]
         else:
-            pdbA = params.pdbA
-        if params.pdbB is None:
-            pdbB = "{0}.pdb".format(pointsB[0].pdbid)
+            colors = None
+
+        if params.radii is not None:
+            radii = [float(l) for l in params.raii]
         else:
-            pdbB = params.pdbB
+            radii = None
 
-        print(create_command(pdbA, pointsA, radii, colors), file=params.outputA)
-        print(create_command(pdbB, pointsB, radii, colors), file=params.outputB)
+        scriptA, scriptB = create_visualizations(pointsA, 
+                                                 pointsB, 
+                                                 alignment,
+                                                 pdbA=params.pdbA, 
+                                                 pdbB=params.pdbB,
+                                                 colors=colors,
+                                                 radii=radii)
 
+        print(scriptA, file=params.outputA)
+        print(scriptB, file=params.outputB)
 
         return 0
 
     @classmethod
     def arguments(cls, stdin, stdout, stderr, environ, task_name):
         from argparse import ArgumentParser
-        from pocketfeature.utils.args import (
-            decompress,
-            FileType,
-        )
-        parser = ArgumentParser("Identify and extract pockets around ligands in a PDB file")
+        from pocketfeature.utils.args import FileType
+        parser = ArgumentParser("Create PyMol scripts to visualize an alignment")
         parser.add_argument('pointsA', metavar='POINTS1',
                                        type=FileType.compressed('r'),
                                        help='Path to FEATURE point file')
@@ -97,14 +129,24 @@ class VisAlign(Task):
         parser.add_argument('-B', '--outputB', metavar='CMD2',
                                               type=FileType('w'),
                                               help='Path to second command output file')
-        parser.add_argument('pdbA', metavar='PDB1', 
-                                    help='Path to first PDB file',
-                                    nargs='?',
-                                    default=None)
-        parser.add_argument('pdbB', metavar='PDB2', 
-                                    help='Path to second PDB file',
-                                    nargs='?',
-                                    default=None)
+        parser.add_argument('--pdbA', metavar='PDB1', 
+                                      help='Path to first PDB file',
+                                      nargs='?',
+                                      default=None)
+        parser.add_argument('--pdbB', metavar='PDB2', 
+                                      help='Path to second PDB file',
+                                      nargs='?',
+                                      default=None)
+        parser.add_argument('--colors', metavar='COLORFILE', 
+                                        help='File of 0.0-1.0 RGB colors to use',
+                                        type=FileType('r'),
+                                        nargs='?',
+                                        default=None)
+        parser.add_argument('--radii', metavar='RADIIFILE', 
+                                        help='File of point radii to use',
+                                        type=FileType('r'),
+                                        nargs='?',
+                                        default=None)
         parser.add_argument('--log', metavar='LOG',
                                      type=FileType,
                                      default=stderr,

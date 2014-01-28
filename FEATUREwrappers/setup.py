@@ -16,7 +16,7 @@ Wrappers to ensure easy environment consistency when running FEATURE from Python
       include_package_data=True,
       zip_safe=True,
       install_requires=[
-#          'numpy>=1.8.0',
+          'numpy>=1.8.0',
           'sh>=1.09',
       ],
       entry_points={}

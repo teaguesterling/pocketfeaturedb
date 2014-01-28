@@ -4,15 +4,22 @@ from __future__ import print_function
 import logging
 import os
 
+from feature.io import (
+    featurefile,
+    pointfile,
+)
 from feature.backends.wrappers import featurize_points
 
-from pocketfeature.io import backgrounds
-from pocketfeature.io import matrixvaluesfile
-from pocketfeature.io import pdbfile
-from pocketfeature.io import residuefile
+from pocketfeature.io import (
+    backgrounds,
+    matrixvaluesfile,
+    pdbfile,
+    residuefile,
+)
 from pocketfeature.io.matrixvaluesfile import MatrixValues
 from pocketfeature.tasks.pocket import (
     create_pocket_around_ligand,
+    find_ligand_in_structure,
     pick_best_ligand,
 )
 from pocketfeature.tasks.compare import score_featurefiles
@@ -20,6 +27,7 @@ from pocketfeature.tasks.align import (
     align_scores_greedy,
     align_scores_munkres,
 )
+from pocketfeature.tasks.visualize import create_visualizations
 from pocketfeature.utils.pdb import guess_pdbid_from_stream
 
 from pocketfeature.tasks.core import Task
@@ -42,48 +50,68 @@ class ComparePockets(Task):
         log.info("Loading PDBs")
 
         log.debug("Extracting PDBIDs")
-        pdbid1, pdb1 = guess_pdbid_from_stream(params.pdb1)
-        pdbid2, pdb2 = guess_pdbid_from_stream(params.pdb2)
+        pdbidA, pdbA = guess_pdbid_from_stream(params.pdbA)
+        pdbidB, pdbB = guess_pdbid_from_stream(params.pdbB)
 
-        log.debug("Loading structure 1")
-        structure1 = pdbfile.load(pdb1, pdbid=pdbid1)
-        log.debug("Loading structure 2")
-        structure2 = pdbfile.load(pdb2, pdbid=pdbid2)
+        log.debug("Loading structure A")
+        structureA = pdbfile.load(pdbA, pdbid=pdbidA)
+        log.debug("Loading structure B")
+        structureB = pdbfile.load(pdbB, pdbid=pdbidB)
 
         log.info("Finding ligands")
-        if params.ligand1 is None:
-            log.debug("Guessing ligand 1")
-            ligand1 = pick_best_ligand(structure1)
+        if params.ligandA is None:
+            log.debug("Guessing ligand A")
+            ligandA = pick_best_ligand(structureA)
         else:
-            log.debug("Searching for ligand 1")
-            ligand1 = find_ligand_in_structure(sturcture1, params.ligand1)
+            log.debug("Searching for ligand A")
+            ligandA = find_ligand_in_structure(structureA, params.ligandA)
 
-        if params.ligand2 is None:
-            log.debug("Guessing ligand 2")
-            ligand2 = pick_best_ligand(structure2)
+        if params.ligandB is None:
+            log.debug("Guessing ligand B")
+            ligandB = pick_best_ligand(structureB)
         else:
-            log.debug("Searching for ligand 2")
-            ligand2 = find_ligand_in_structure(sturcture2, params.ligand2)
+            log.debug("Searching for ligand B")
+            ligandB = find_ligand_in_structure(structureB, params.ligandB)
         
-        if None in (ligand1, ligand2):
+        if None in (ligandA, ligandB):
             log.error("Could not find both ligands")
             return -1
         
         log.info("Creating pockets")
-        log.debug("Creating pocket 1")
-        pocket1 = create_pocket_around_ligand(structure1, ligand1, cutoff=params.distance)
-        log.debug("Creating pocket 2")
-        pocket2 = create_pocket_around_ligand(structure2, ligand2, cutoff=params.distance)
+        log.debug("Creating pocket A")
+        pocketA = create_pocket_around_ligand(structureA, ligandA, cutoff=params.distance)
+        if params.ptfA is not None:
+            log.debug("Writing pocket A")
+            pointfile.dump(pocketA.points, params.pftA)
+            params.ptfA.close()
+        log.debug("Creating pocket B")
+        pocketB = create_pocket_around_ligand(structureB, ligandB, cutoff=params.distance)
+        if params.ptfB is not None:
+            log.debug("Writing pocket B")
+            pointfile.dump(pocketB.points, params.pftB)
+            params.ptfB.close()
     
         log.info("FEATURIZING Pockets")
-        log.debug("FEATURIZING Pocket 1")
-        featurefile1 = featurize_points(pocket1.points)
-        log.debug("FEATURIZING Pocket 2")
-        featurefile2 = featurize_points(pocket2.points)
+        log.debug("FEATURIZING Pocket A")
+        featurefileA = featurize_points(pocketA.points)
+        if params.ffA is not None:
+            log.debug("Wring FEATURE file A")
+            featurefile.dump(featurefileA, params.ffA)
+            params.ffA.close()
+        log.debug("FEATURIZING Pocket B")
+        featurefileB = featurize_points(pocketB.points)
+        if params.ffB is not None:
+            log.debug("Wring FEATURE file B")
+            featurefile.dump(featurefileB, params.ffB)
+            params.ffB.close()
     
         log.info("Comparing Vectors")
-        scores_iter = score_featurefiles(background, featurefile1, featurefile2)
+        scores_iter = score_featurefiles(background, featurefileA, featurefileB)
         scores = MatrixValues(scores_iter, value_dims=2)
+        if params.scores is not None:
+            log.debug("Writing scores")
+            matrixvaluesfile.dump(scores, params.scores)
+            params.scores.close()
         normalized = scores.slice_values(1)  # Normalized in second position
 
         log.info("Aligning Pockets")
@@ -93,6 +121,18 @@ class ComparePockets(Task):
 
         matrixvaluesfile.dump(alignment, params.output)
         log.info("Alignment Score: {0}".format(total_score))
+
+        log.info("Creating PyMol scripts")
+        scriptA, scriptB = create_visualizations(pocketA.points, pocketB.points, alignment,
+                                                 pdbA=params.pdbA.name,
+                                                 pdbB=params.pdbB.name)
+
+        if params.pymolA is not None:
+            log.debug("Writing first PyMol script") 
+            print(scriptA, file=params.pymolA)
+        if params.pymolB is not None:
+            log.debug("Writing first PyMol script") 
+            print(scriptB, file=params.pymolB)
 
         return 0
 
@@ -104,22 +144,22 @@ class ComparePockets(Task):
             FileType,
         )
         parser = ArgumentParser("Identify and extract pockets around ligands in a PDB file")
-        parser.add_argument('pdb1', metavar='PDB1', 
+        parser.add_argument('pdbA', metavar='PDBA', 
                                     type=FileType.compressed('r'),
                                     help='Path to first PDB file')
-        parser.add_argument('pdb2', metavar='PDB2', 
+        parser.add_argument('pdbB', metavar='PDBB', 
                                     type=FileType.compressed('r'),
                                     help='Path to second PDB file')
-        parser.add_argument('ligand1', metavar='LIG1',
-                                      type=str,
-                                      nargs='?',
-                                      default=None,
-                                      help='Ligand ID to build first pocket around [default: <largest>]')
-        parser.add_argument('ligand2', metavar='LIG2',
-                                      type=str,
-                                      nargs='?',
-                                      default=None,
-                                      help='Ligand ID to build second pocket around [default: <largest>]')
+        parser.add_argument('--ligandA', metavar='LIGA',
+                                         type=str,
+                                         nargs='?',
+                                         default=None,
+                                         help='Ligand ID to build first pocket around [default: <largest>]')
+        parser.add_argument('--ligandB', metavar='LIGB',
+                                         type=str,
+                                         nargs='?',
+                                         default=None,
+                                         help='Ligand ID to build second pocket around [default: <largest>]')
         parser.add_argument('-b', '--background', metavar='FEATURESTATS',
                                       type=FileType.compressed('r'),
                                       default='background.ff',
@@ -136,10 +176,45 @@ class ComparePockets(Task):
                                               type=float,
                                               default=cls.DEFAULT_CUTOFF,
                                               help='Minium score (cutoff) to align [default: %(default)s')
-        parser.add_argument('-o', '--output', metavar='PTF',
+        parser.add_argument('-o', '--output', metavar='ALIGNMENT',
                                               type=FileType.compressed('w'),
                                               default=stdout,
-                                              help='Path to output file [default: STDOUT]')
+                                              help='Path to alignment file [default: STDOUT]')
+        parser.add_argument('--ptfA', metavar='PTFA',
+                                      type=FileType.compressed('w'),
+                                      default=None,
+                                      nargs='?',
+                                      help='Path to first point file [default: None]')
+        parser.add_argument('--ptfB', metavar='PTFB',
+                                      type=FileType.compressed('w'),
+                                      default=None,
+                                      nargs='?',
+                                      help='Path to second point file [default: None]')
+        parser.add_argument('--ffA', metavar='FFA',
+                                     type=FileType.compressed('w'),
+                                     default=None,
+                                     nargs='?',
+                                     help='Path to first FEATURE file [default: None]')
+        parser.add_argument('--ffB', metavar='FFB',
+                                     type=FileType.compressed('w'),
+                                     default=None,
+                                     nargs='?',
+                                     help='Path to second FEATURE file [default: None]')
+        parser.add_argument('--scores', metavar='SCORES',
+                                        type=FileType.compressed('w'),
+                                        default=None,
+                                        nargs='?',
+                                        help='Path to scores file [default: None]')
+        parser.add_argument('--pymolA', metavar='PYMOLA',
+                                     type=FileType('w'),
+                                     default=None,
+                                     nargs='?',
+                                     help='Path to first PyMol script [default: None]')
+        parser.add_argument('--pymolB', metavar='PYMOLB',
+                                     type=FileType('w'),
+                                     default=None,
+                                     nargs='?',
+                                     help='Path to second PyMol script [default: None]')
         parser.add_argument('--log', metavar='LOG',
                                      type=FileType,
                                      default=stderr,

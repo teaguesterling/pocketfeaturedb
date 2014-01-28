@@ -38,7 +38,7 @@ class FileType(argparse.FileType):
         if string == '-':
             stream = super(FileType, self).__call__(string)
         try:
-            stream = self._opener(string, **self._extraargs)
+            stream = self._opener(string, mode=self._mode, **self._extraargs)
         except OSError as e:
             message = _("can't open '%s': %s")
             raise ArgumentTypeError(message % (string, e))
