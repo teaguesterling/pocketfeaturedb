@@ -30,18 +30,21 @@ from pocketfeature.tasks.align import (
 from pocketfeature.tasks.visualize import create_visualizations
 from pocketfeature.utils.pdb import guess_pdbid_from_stream
 
+from pocketfeature.utils.args import LOG_LEVELS
 from pocketfeature.tasks.core import Task
 
 
 class ComparePockets(Task):
     LIGAND_RESIDUE_DISTANCE = 6.0
     DEFAULT_CUTOFF = -0.15
+    BACKGROUND_FF_DEFAULT = 'background.ff'
+    BACKGROUND_COEFF_DEFAULT = 'background.coeffs'
 
     def run(self):
         params = self.params
         logging.basicConfig(stream=params.log)
         log = logging.getLogger('pocketfeature')
-        log.setLevel(logging.DEBUG)
+        log.setLevel(LOG_LEVELS.get(params.log_level, 'debug'))
 
         log.info("Loading background")
         background = backgrounds.load(stats_file=params.background,
@@ -123,7 +126,9 @@ class ComparePockets(Task):
         log.info("Alignment Score: {0}".format(total_score))
 
         log.info("Creating PyMol scripts")
-        scriptA, scriptB = create_visualizations(pocketA.points, pocketB.points, alignment,
+        scriptA, scriptB = create_visualizations(pocketA.points, 
+                                                 pocketB.points, 
+                                                 alignment,
                                                  pdbA=params.pdbA.name,
                                                  pdbB=params.pdbB.name)
 
@@ -143,6 +148,18 @@ class ComparePockets(Task):
             decompress,
             FileType,
         )
+        background_ff = cls.BACKGROUND_FF_DEFAULT
+        background_coeff = cls.BACKGROUND_COEFF_DEFAULT
+
+        if 'FEATURE_DIR' in os.environ:
+            feature_dir = os.environ.get('FEATURE_DIR')
+            env_bg_ff = os.path.join(feature_dir, background_ff)
+            env_bg_coeff = os.path.join(feature_dir, background_coeff)
+            if not os.path.exists(background_ff) and os.path.exists(env_bg_ff):
+                background_ff = env_bg_ff
+            if not os.path.exists(background_coeff) and os.path.exists(env_bg_coeff):
+                background_coeff = env_bg_coeff
+
         parser = ArgumentParser("Identify and extract pockets around ligands in a PDB file")
         parser.add_argument('pdbA', metavar='PDBA', 
                                     type=FileType.compressed('r'),
@@ -162,11 +179,11 @@ class ComparePockets(Task):
                                          help='Ligand ID to build second pocket around [default: <largest>]')
         parser.add_argument('-b', '--background', metavar='FEATURESTATS',
                                       type=FileType.compressed('r'),
-                                      default='background.ff',
+                                      default=background_ff,
                                       help='FEATURE file containing standard devations of background [default: %(default)s]')
         parser.add_argument('-n', '--normalization', metavar='COEFFICIENTS',
                                       type=FileType.compressed('r'),
-                                      default='background.coeffs',
+                                      default=background_coeff,
                                       help='Map of normalization coefficients for residue type pairs [default: %(default)s')
         parser.add_argument('-d', '--distance', metavar='CUTOFF',
                                               type=float,
@@ -219,6 +236,11 @@ class ComparePockets(Task):
                                      type=FileType,
                                      default=stderr,
                                      help='Path to log errors [default: %(default)s]')
+        parser.add_argument('--log-level', metavar='LEVEL',
+                                           choices=LOG_LEVELS.keys(),
+                                           default='debug',
+                                           nargs='?',
+                                           help="Set log level (%(choices)s) [default: %(default)s]")
         return parser
 
 

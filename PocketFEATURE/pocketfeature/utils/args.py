@@ -1,12 +1,16 @@
 import argparse
+from collections import OrderedDict
 from gettext import gettext as _
 import gzip
+import logging
 import os
 
 from feature.io.common import (
     decompress,
     open_compressed,
 )
+
+LOG_LEVELS = {logging.getLevelName(level).lower(): level for level in range(10, 60, 10)}
 
 
 def is_normal_file(stream):

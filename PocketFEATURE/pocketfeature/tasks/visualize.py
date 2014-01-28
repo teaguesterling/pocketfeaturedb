@@ -69,7 +69,7 @@ def create_visualizations(pointsA, pointsB, alignment, pdbA=None,
         pdbB = "{0}.pdb".format(pointsB[0].pdbid) if pdbA is None else pdbB
         
         scriptA = create_command(pdbA, pointsA, radii, colors)
-        scriptB = create_command(pdbA, pointsB, radii, colors)
+        scriptB = create_command(pdbB, pointsB, radii, colors)
 
         return scriptA, scriptB 
 

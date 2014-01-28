@@ -32,6 +32,8 @@ def score_featurefiles(background, file1, file2):
 
 
 class FeatureFileCompare(Task):
+    BACKGROUND_FF_DEFAULT = 'background.ff'
+    BACKGROUND_COEFF_DEFAULT = 'background.coeffs'
     def run(self):
         params = self.params
         stat_background = backgrounds.load(stats_file=params.background, 
@@ -52,7 +54,23 @@ class FeatureFileCompare(Task):
             FileType,
         )
         from pocketfeature.utils.args import FileType
-        parser = ArgumentParser("Compute tanimoto matrix for two FEATURE vectors with a background and score normalizations")
+
+        background_ff = cls.BACKGROUND_FF_DEFAULT
+        background_coeff = cls.BACKGROUND_COEFF_DEFAULT
+
+        if 'FEATURE_DIR' in os.environ:
+            feature_dir = os.environ.get('FEATURE_DIR')
+            env_bg_ff = os.path.join(feature_dir, background_ff)
+            env_bg_coeff = os.path.join(feature_dir, background_coeff)
+            if not os.path.exists(background_ff) and os.path.exists(env_bg_ff):
+                background_ff = env_bg_ff
+            if not os.path.exists(background_coeff) and os.path.exists(env_bg_coeff):
+                background_coeff = env_bg_coeff
+
+        parser = ArgumentParser(
+            """Compute tanimoto matrix for two FEATURE vectors with a background 
+               and score normalizations. If background files are not provided, they 
+               will be checked for in the current directory as well as FEATURE_DIR""")
         parser.add_argument('features1', metavar='FEATUREFILE1', 
                                           type=FileType.compressed('r'),
                                           help='Path to first FEATURE file')
@@ -61,12 +79,12 @@ class FeatureFileCompare(Task):
                                          help='Path to second FEATURE file')
         parser.add_argument('-b', '--background', metavar='FEATURESTATS',
                                       type=FileType.compressed('r'),
-                                      default='background.ff',
+                                      default=background_ff,
                                       help='FEATURE file containing standard devations of background [default: %(default)s]')
         parser.add_argument('-n', '--normalization', metavar='COEFFICIENTS',
                                       type=FileType.compressed('r'),
-                                      default='background.coeffs',
-                                      help='Map of normalization coefficients for residue type pairs [default: %(default)s')
+                                      default=background_coeff,
+                                      help='Map of normalization coefficients for residue type pairs [default: %(default)s]')
         parser.add_argument('-o', '--output', metavar='VALUES',
                                               type=FileType.compressed('w'),
                                               default=stdout,

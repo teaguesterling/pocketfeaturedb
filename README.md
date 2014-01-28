@@ -13,6 +13,8 @@ Libraries Included
  * **PocketFEATURE**: Implementations of PocketFEATURE scripts and utilities in Python
  * **FEATUREdb**: FEATUREDB Implementation (currently empty)
 
+ * **data**: Includes default background data for PocketFEATURE
+
 Requirements
 ------------
 
