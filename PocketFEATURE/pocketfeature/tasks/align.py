@@ -5,6 +5,7 @@ from pocketfeature.algorithms import (
     greedy_align,
     munkres_align,
 )
+from pocketfeature.io import matrixvaluesfile
 from pocketfeature.io.matrixvaluesfile import MatrixValues
 
 from pocketfeature.tasks.core import Task
@@ -33,11 +34,12 @@ class AlignScores(Task):
 
     def run(self):
         params = self.params
-        align = params.method
+        align = self.ALIGNMENT_METHODS[params.method]
         columns = [params.score_column]
         scores = matrixvaluesfile.load(params.scores, columns=columns, cast=float)
-        alignment = align(scores)
+        alignment = align(scores, params.cutoff)
         matrixvaluesfile.dump(alignment, params.output)
+        print("Score: {0}".format(sum(alignment.values())), file=params.log)
         return 0
 
     @classmethod

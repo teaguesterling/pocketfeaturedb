@@ -29,6 +29,7 @@ setup(name='PocketFEATURE',
             pf_task_script('compare:FeatureFileCompare', 'pf_compare'),
             pf_task_script('align:AlignScores', 'pf_align'),
             pf_task_script('featurize:Featurize', 'pf_featurize'),
+            pf_task_script('visualize:VisAlign', 'pf_vis'),
             pf_task_script('full_comparison:ComparePockets', 'run_pf'),
         ]
       }
