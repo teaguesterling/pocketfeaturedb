@@ -38,10 +38,13 @@ Installation
 
 Scripts
 -------
- * **pf_extract**: 
+### pf\_extract
+
    Find or list pockets around ligands and write as either a Pointfile or 
    list of Residues.
-   *Examples:*
+
+   **Examples:**
+
         # List ligands found in PDB
         $ pf_extract 1fo4.pdb -l
         # Generate pocket around "best" (biggest) ligand with specified PDB
@@ -49,7 +52,9 @@ Scripts
         # Generate pocket around ATP (Full Ligand ID and short)
         $ pf_extract 1qhx.pdb 1qhx/0/A/501/ATP
         $ pf_extract 1qhx.pdb ATP -o 1qhx-ATP.ptf
-   *Command Usage:*
+
+   **Command Usage:**
+
         usage: Identify and extract pockets around ligands in a PDB file
                [-h] [-i PDBID] [-o PTF] [--log LOG] [-d CUTOFF] [-p] [-r] [-l]
                [PDB] [LIG]
@@ -73,16 +78,21 @@ Scripts
           -r, --print-residues  Print residue ID list instead of point file
           -l, --list-only       List residues instead of creating pocket
 
- * **pf_featurize**: 
+### pf\_featurize
+
    A wrapper around featurize that allows command line arguments to set
    or override environmental variables
-   *Examples:*
+
+   **Examples:**
+
         $ pf_featurize -P 1qhx-ATP.ptf \
                        --feature-dir=~/FEATURE/trunk \
                        --feature-bin=~/FEATURE/trunk \
                        --pdb-dir=~/db/pdb \
                        --dssp-dir=~/db/dssp > 1qhx-ATP.ff
-   *Command Usage:*
+
+   **Command Usage:**
+
         usage: Call featurize in a custom environment [-h] [-P [POINTILE]]
                                                       [-n [SHELLS]] [-w [WIDTH]]
                                                       [-x [HETATMS]]
@@ -113,14 +123,18 @@ Scripts
           --dssp-dir [DSSP_DIR]
 
 
- * **pf_compare**:
+### pf\_compare
    Compute pairwise tanimoto similarities for two FEATURE files based
    on provided background files.
-   *Examples*:
+
+   **Examples:**
+
         $ pf_compare 1qhx-ATP.ff 1qrd-FAD.ff -b data/background.ff -n data/background.coeffs -o scores
         # Default background files are ./background.ff and ./background.coeffs
         $ pf_compare1qhx-ATP.ff 1qrd-FAD.ff > 1qhx-ATP-1qrd-FAD.scores
-   *Command Usage:*
+
+   **Command Usage:**
+
         usage: Compute tanimoto matrix for two FEATURE vectors with a background and score normalizations
                [-h] [-b FEATURESTATS] [-n COEFFICIENTS] [-o VALUES] [--log LOG]
                FEATUREFILE1 FEATUREFILE2
@@ -142,14 +156,18 @@ Scripts
           --log LOG             Path to log errors [default: STDERR]
 
 
- * **pf_align**:
+### pf\_align
    Compute the best alignment of a scores file.
-   *Examples:*
+
+   **Examples:**
+
         # Using defaults (standard greedy alignment and cutoff of -0.15)
         $ pf_align 1qhx-ATP-1qrd-FAD.scores -o 1qhx-ATP-1qrd-FAD.aligned
         # Cutoff at 0.0
         $ cat 1qhx-ATP-1qrd-FAD.scores | pf_align -c 0 > 1qhx-ATP-1qrd-FAD.aligned
-   *Command Usage:*
+
+   **Command Usage:**
+
         usage: Align scores from a PocketFEATURE score matrix [-h] [-c CUTOFF]
                                                               [-s COLINDEX]
                                                               [-m ALIGN_METHOD]
@@ -173,9 +191,12 @@ Scripts
                                 Path to output file [default: STDOUT]
           --log LOG             Path to log errors [default: STDERR]
 
- * **pf_vis**
+### pf\_vis
+
    Create a Pymol script to visualize the alignment.
-   *Examples:*
+
+   **Examples:**
+
         # Assuming default PDB file names, colors and radii
         $ pf_vis 1qhx-ATP.ptf 1qrd-FAD.ptf 1qhx-ATP-1qrd-FAD.aligned
         # Explictly specifying PDB names
@@ -183,7 +204,9 @@ Scripts
                  --pdbA=somepdb.pdb --pdbB=../1qrd.pdb
         # Overriding colors
         $ pf_vis 1qhx-ATP.ptf 1qrd-FAD.ptf 1qhx-ATP-1qrd-FAD.aligned --colors=reds.colors
-   *Command Usage*:
+
+   **Command Usage:**
+
         usage: Create PyMol scripts to visualize an alignment [-h] [-A CMD1] [-B CMD2]
                                                               [--pdbA [PDB1]]
                                                               [--pdbB [PDB2]]
@@ -211,9 +234,12 @@ Scripts
           --log LOG             Path to log errors [default: <open file '<stderr>',
                                 mode 'w' at 0x7f4e15f61270>]
 
- * **run_fp**:
+### run\_fp
+
    Run an entire PocketFEATURE calculation, writing out desired intermediate files
-  *Examples*:
+
+  **Examples:**
+
         # Only View alignment and scores (using all defaults)
         $ run_pf 1qrd.pdb 1qhx.pdb
         # Produce visualization Scripts and override backgrounds
@@ -222,7 +248,9 @@ Scripts
                  --pymolA=pdba.py --pymolb=pdbb.py
         # Save Pointfiles
         $ run_pf ../PDBA.pdb ../PDBB.pdb --ptfA=pdba.ptf --ptfB=pdbb.ptf
-  *Command Usage:*
+
+  **Command Usage:**
+
         usage: Identify and extract pockets around ligands in a PDB file
                [-h] [--ligandA [LIGA]] [--ligandB [LIGB]] [-b FEATURESTATS]
                [-n COEFFICIENTS] [-d CUTOFF] [-c CUTOFF] [-o ALIGNMENT]
@@ -262,13 +290,3 @@ Scripts
           --log LOG             Path to log errors [default: <open file '<stderr>',
                                 mode 'w' at 0x7f5e988d9270>]
  
-        
-
-        
-
-
-
- 
-
-
-
