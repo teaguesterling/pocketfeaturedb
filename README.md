@@ -41,6 +41,18 @@ Installation
         $ python setup.py install
         $ cd ..
 
+
+Quick Start
+-----------
+Once the installation is complete, the following will give you a quick introduction to using PocketFEAUTRE.
+
+    $ cd <pocketfeaturedb directory>
+    $ run_pf data/1qhx.pdb data/1qrd.pdb \
+             -b data/background.ff -n data/background.coeffs\
+             --pymolA=/tmp/1qhx.py --pymolB=/tmp/1qrd.py
+    $ pymol -l /tmp/1qhx.py &
+    $ pymol -l /tmp/1qrd.py &
+
 Scripts
 -------
 ### pf\_extract
@@ -205,10 +217,16 @@ Scripts
         # Assuming default PDB file names, colors and radii
         $ pf_vis 1qhx-ATP.ptf 1qrd-FAD.ptf 1qhx-ATP-1qrd-FAD.aligned
         # Explictly specifying PDB names
-        $ pf_vis 1qhx-ATP.ptf 1qrd-FAD.ptf 1qhx-ATP-1qrd-FAD.aligned \
+        $ pf_vis 1qhx-ATP.ptf 1qrd-FAD.ptf 1qhx-ATP-1qrd-FAD.aligned\
                  --pdbA=somepdb.pdb --pdbB=../1qrd.pdb
         # Overriding colors
-        $ pf_vis 1qhx-ATP.ptf 1qrd-FAD.ptf 1qhx-ATP-1qrd-FAD.aligned --colors=reds.colors
+        $ pf_vis 1qhx-ATP.ptf 1qrd-FAD.ptf 1qhx-ATP-1qrd-FAD.aligned\
+                 --colors=reds.colors\
+                 --A=somepdb.py --B=1qrd.py
+        # Viewing PyMol scripts
+        $ pymol -l somepdb.py &
+        $ pymol -l 1qrd.py &
+        
 
    **Command Usage:**
 
