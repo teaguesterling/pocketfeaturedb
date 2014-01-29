@@ -31,7 +31,7 @@ Installation
  0. Install Python 2.7 (If needed)
  1. Install pyFEATURE (Dependencies will be installed)
 
-        $ cd FEATUREwrappers
+        $ cd pyFEATURE
         $ python setup.py install
         $ cd ..
 
