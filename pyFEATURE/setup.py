@@ -3,11 +3,11 @@ import sys, os
 
 version = '0.1'
 
-setup(name='FEATUREwrappers',
+setup(name='pyFEATURE',
       version=version,
       description="Wrappers for running FATURE in Python",
       long_description="""\
-Wrappers to ensure easy environment consistency when running FEATURE from Python""",
+Python interface to the Stanford FEATURE biomolecular structure analysis tools""",
       author='Teague Sterling',
       author_email='teague@mail.sfsu.edu',
       url='http://feature.stanford.edu',
@@ -16,7 +16,7 @@ Wrappers to ensure easy environment consistency when running FEATURE from Python
       include_package_data=True,
       zip_safe=True,
       install_requires=[
-          'numpy>=1.8.0',
+          'numpy>=1.6.2',
           'sh>=1.09',
       ],
       entry_points={}
