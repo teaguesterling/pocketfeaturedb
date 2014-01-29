@@ -148,13 +148,13 @@ class PocketFinder(Task):
                                               type=float,
                                               default=cls.LIGAND_RESIDUE_DISTANCE,
                                               help='Residue active site distance threshold [default: %(default)s]')
-        parser.add_argument('-p', '--print-pointfile', action='store_true',
+        parser.add_argument('-P', '--print-pointfile', action='store_true',
                                                        default=True,
                                                        help='Print point file (default behavior)')
-        parser.add_argument('-r', '--print-residues', action='store_true',
+        parser.add_argument('-R', '--print-residues', action='store_true',
                                                       default=False,
                                                       help='Print residue ID list instead of point file')
-        parser.add_argument('-l', '--list-only', action='store_true',
+        parser.add_argument('-L', '--list-only', action='store_true',
                                                  default=False,
                                                  help='List residues instead of creating pocket')
         return parser

@@ -202,3 +202,36 @@ class keydefaultdict(defaultdict):
         else:
             ret = self[key] = self.default_factory(key)
             return ret
+
+
+class filemap(keydefaultdict):
+    def __init__(self, default_factory, root=None, 
+                                        extension=None, 
+                                        mode='r',
+                                        opener=open):
+        self.name_factory = default_factory
+        self.extension = extension
+        self.mode = mode
+        self.opener = open
+        super(filemap, self).__init__(self.get_file_for)
+        self.root = root
+    
+    def get_path_for(self, obj):
+        name = self.name_factory(obj)
+        if self.extension:
+            name = "{0}.{1}".format(name, self.extension)
+        path = os.path.join(self.root, name)
+        return path
+
+    def get_file_for(self, obj):
+        path = self.get_path_for(obj)
+        io = self.opener(path, self.mode)
+        return io
+
+    def close(self):
+        for key in self:
+            try:
+                self[key].close()
+            except:
+                pass
+        

@@ -9,7 +9,7 @@ Teague Sterling, Tianyun Lui
 Libraries Included
 ------------------
 
- * **FEATUREwarppers**: Wrappers for calling FEATURE binaries from Python
+ * **pyFEATURE**: Wrappers for calling FEATURE binaries from Python
  * **PocketFEATURE**: Implementations of PocketFEATURE scripts and utilities in Python
  * **FEATUREdb**: FEATUREDB Implementation (currently empty)
 
@@ -19,9 +19,9 @@ Requirements
 ------------
 
  * Python 2.7
- * BioPython
- * Numpy
- * SciPy (For BioPython)
+ * BioPython [1.58 or higher]
+ * Numpy [1.62 or higher]
+ * SciPy (For BioPython) [0.11.0 or higher]
  * sh (For subprocess calling)
  * Munkres (for experimental alignment)
 
@@ -29,7 +29,7 @@ Installation
 ------------
 
  0. Install Python 2.7 (If needed)
- 1. Install FEATUREwrappers (Dependencies will be installed)
+ 1. Install pyFEATURE (Dependencies will be installed)
 
         $ cd FEATUREwrappers
         $ python setup.py install
@@ -73,7 +73,7 @@ Scripts
    **Command Usage:**
 
         usage: Identify and extract pockets around ligands in a PDB file
-               [-h] [-i PDBID] [-o PTF] [--log LOG] [-d CUTOFF] [-p] [-r] [-l]
+               [-h] [-i PDBID] [-o PTF] [--log LOG] [-d CUTOFF] [-P] [-R] [-L]
                [PDB] [LIG]
         
         positional arguments:
@@ -90,10 +90,10 @@ Scripts
                                 mode 'w' at 0x7f05d94f4270>]
           -d CUTOFF, --distance CUTOFF
                                 Residue active site distance threshold [default: 6.0]
-          -p, --print-pointfile
+          -P, --print-pointfile
                                 Print point file (default behavior)
-          -r, --print-residues  Print residue ID list instead of point file
-          -l, --list-only       List residues instead of creating pocket
+          -R, --print-residues  Print residue ID list instead of point file
+          -L, --list-only       List residues instead of creating pocket
 
 ### pf\_featurize
 

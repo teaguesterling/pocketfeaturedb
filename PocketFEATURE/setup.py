@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 import sys, os
 
-version = '0.1'
+version = '0.2'
 PF_TASKS = 'pocketfeature.tasks'
 
 def pf_task_script(task, script):
@@ -18,10 +18,10 @@ setup(name='PocketFEATURE',
       include_package_data=True,
       zip_safe=True,
       install_requires=[
-          'numpy>=1.8.0',
-          'biopython>=1.60',
+          'numpy>=1.6.2',
+          'biopython>=1.58',
           'munkres>=1.0.6',
-          'FEATUREwrappers>=0.1dev',
+          'pyFEATURE>=0.1dev',
       ],
       entry_points={
         'console_scripts': [
