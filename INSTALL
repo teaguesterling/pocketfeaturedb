@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# INSTALL PocketFEATURE
+# =====================
+# 
+# RUNNING THIS SCRIPT WILL ATTEMPT TO AUTOMATICALLY INSTALL
+# sudo ./INSTALL
+#
+# Installing PocketFEATURE requires installing two packages:
+# pyFEATURE, a set of wrappers and tools for working with FEATURE data
+# and PocketFEATURE itself.
+#
+# Both installations are simple Python setup scripts.
+#
+# First install pyFEATURE:
+# ------------------------
+#
+# $ cd pyFEATURE
+# $ sudo python setup.py install
+# $ cd ../
+# 
+# Second install PocketFEATURE:
+# -----------------------------
+#
+# $ cd PocketFEATURE
+# $ sudo python setup.py install
+# $ ../
+#
+# Then run a test case:
+#
+#
+
+echo "INSTALLING pyFEATURE"
+cd pyFEATURE
+python setup.py install
+cd ../
+
+echo "INSTALLING PocketFEATURE"
+cd PocketFEATURE
+python setup.py install
+cd ../
+
+echo "RUNNING SANITY TEST"
+run_pf data/1qhx.pdb data/1qrd.pdb \
+    -b data/background.ff -n data/background.coeffs\
+    --pymolA=/tmp/1qhx.py --pymolB=/tmp/1qrd.py
+pymol -l /tmp/1qhx.py &
+pymol -l /tmp/1qrd.py &
