@@ -8,6 +8,9 @@ import itertools
 GZIP_MAGIC = "\x1f\x8b"
 
 def decompress(stream):
+    """ Try to read determine if a stream is compressed, 
+        if so use Gzip to decompress. Otherwise simply pass though
+    """
     try:
         checked = BufferedReader(stream)
         magic = checked.peek(2)
@@ -24,16 +27,20 @@ def decompress(stream):
 
 
 def open_compressed(path, mode='r', **options):
+    """ Determine if a given path should be opened with gzip """
     if path.endswith('.gz'):
         # Must open gzipped files in binary
-        if not mode.endswith('b'):
-            mode += 'b'
+        #if not mode.endswith('b'):
+        #    mode += 'b'
         return gzip.open(path, mode=mode, **options)
     else:
         return open(path, mode=mode, **options)
 
 
 def attempt_cast(value, types=(int, float, complex), default=None):
+    """ Given a list of types, attempt to cast to all until one is 
+        successful. Otherwise return default.
+    """
     for attempt in types:
         try:
             return attempt, attempt(value)

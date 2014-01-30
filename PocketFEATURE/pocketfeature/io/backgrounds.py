@@ -41,6 +41,7 @@ class FeatureBackgroundMetaData(FeatureMetaData):
 
 
 class BackgroundEnvironment(object):
+    """ An object containing information about a calculated PocketFEATURE background """
 
     def __init__(self, std_dev, mean=None, 
                                 normalizations=None, 

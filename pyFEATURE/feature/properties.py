@@ -7,7 +7,6 @@ import numpy as np
 def property_dtype(property):
     """ 
         STUB: Eventually this should create int or float types
-
     """
     return np.dtype(float)
 

@@ -8,7 +8,12 @@ from pocketfeature.utils.ff import (
 )
 from pocketfeature.residues import CENTER_FUNCTIONS
 
+
 class Pocket(object):
+    """ Representation of a PocketFEATURE pocket as a list of 
+        residues from a PDB, an (optional) defining ligand, and
+        a method of mapping residues to active sites
+    """
 
     def __init__(self, residues, pdbid=None,
                                  defined_by=None,

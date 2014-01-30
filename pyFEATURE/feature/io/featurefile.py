@@ -56,6 +56,7 @@ class FeatureMetaData(MetaData):
 
     # We special case when the COORDINANTS comment is present
     def get_comment_index(self, name):
+        """ Given a comment name, find its index in the comment list """
         idx = self.comments.index(name)
         if self._has_coords_comment:
             return idx - 1
@@ -63,10 +64,12 @@ class FeatureMetaData(MetaData):
             return idx
 
     def get_property_index(self, name):
+        """ Find the index of a specific property in the property list """
         return self.properties.index(name)
 
     @property
     def properties_dtype(self):
+        """ Create the numpy dtype of a vector for the given metadata configuration """
         return self.properties.dtype()
 
     @property
@@ -95,6 +98,7 @@ class FeatureMetaData(MetaData):
         return self.get('COMMENTS', ItemNameList())
 
     def create_vector_template(self):
+        """ Generate an empty FEATURE vector object for the given metadata """
         if COORDINANTS in self.comments:
             comments = [""] * len(self.comments)
         else:
@@ -130,6 +134,7 @@ class FeatureVector(object):
 
     @property
     def pdbid(self):
+        """ Guessed PDBID """
         # This is an approximate method
         if 'PDB' in self.comments:
             return self.get_named_comment('PDB')

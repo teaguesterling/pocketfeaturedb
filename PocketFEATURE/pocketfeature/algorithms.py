@@ -10,6 +10,14 @@ from munkres import Munkres
 
 
 def cutoff_tanimoto_similarity(cutoffs, a, b, zeroed=False):
+    """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
+        This method takes two vectors and treats each pair of elments matched
+        they differ by less than the supplied cutoff for that index.
+        The number matched elements is then divided by the total number of
+        elements "present" (e.g. non-zero) and this value returned as 
+        the score.
+        If zeroed is false, the elements also need the same sign.
+    """
     union = np.logical_or(a != 0, b != 0)
     if not zeroed:
         same_sign = np.sign(a) == np.sign(b)
@@ -60,6 +68,10 @@ def normalize_score(score, mode):
 
 
 def greedy_align(scores, maximize=False):
+    """ Given a MatrixValue object, elements in one set are
+        aligned with the best unaligned element in the other set
+        until none remain
+    """
     # Takes a MatrixValue object instead of an array for now
     accepted = []
     chosen_keys = set()
@@ -95,6 +107,7 @@ def munkres_align(scores, shift_negative=False, maximize=False):
 
 
 class GaussianStats(object):
+    """ A class for calculating simple statistics over streams of data """
 
     def __init__(self, n=0, mean=None, m2=None):
          self.reset(n=n, mean=mean, m2=m2)
@@ -169,6 +182,9 @@ class GaussianStats(object):
 
 
 class Indexer(defaultdict):
+    """ A data structure for assigning unique indexes (ids) to a collection of items.
+        Provided items must be hashable
+    """
 
     def __init__(self, items=[]):
         super(Indexer, self).__init__(lambda: len(self))
