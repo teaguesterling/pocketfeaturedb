@@ -18,6 +18,8 @@ import sh
 
 SCRATCH_DIR = '/tmp'
 
+REQUIRED_ENVIRONMENT = ('FEATURE_DIR', 'PDB_DIR', 'DSSP_DIR')
+
 FEATURE_ROOT = os.environ.get('FEATURE_ROOT', '/usr/local/feature')
 
 # Using bundled FEATURE in case nothing was found
@@ -28,7 +30,8 @@ FEATURE_DIR = os.environ.get('FEATURE_DIR', os.path.join(FEATURE_ROOT, 'data'))
 FEATURE_BIN = os.environ.get('FEATURE_BIN', os.path.join(FEATURE_ROOT, 'bin'))
 FEATURE_TOOLS_BIN = os.environ.get('FEATURE_TOOLS_BIN', FEATURE_BIN)
 
-DSSP_BIN = os.environ.get('DSSP', os.path.join(FEATURE_TOOLS_BIN, 'dssp-2.0.4-linux-amd64'))
+DSSP_NAME = 'dssp-2.0.4-linux-amd64'
+DSSP_BIN = os.environ.get('DSSP', os.path.join(FEATURE_TOOLS_BIN, DSSP_NAME))
 FEATURIZE_BIN = os.environ.get('FEATURIZE', os.path.join(FEATURE_BIN, 'featurize'))
 
 FEATURE_DATA_DIR = os.environ.get('FEATURE_DATA_DIR', FEATURE_DIR)
@@ -57,6 +60,22 @@ default_environ.update({
 })
 
 
+def locate_subprocess_binary(name, expected_path, raise_error=True):
+    try:
+        if os.path.exists(expected_path):
+            return sh.Command(expected_path)
+        else:
+            return sh.Command(name)
+    except sh.CommandNotFound:
+        def error(*args, **kwargs):
+            raise NotImplementedError("{0} not available in {1}".format(
+                name, os.environ.get('PATH', [])))
+        if raise_error:
+            error()
+        else:
+            return error
+
+
 """:
     DSSP generator from http://swift.cmbi.ru.nl/gv/dssp/
 
@@ -65,11 +84,7 @@ default_environ.update({
       -o OUTFILE: DSSP
     Ex: -i /db/pdb/1qhx.pdb -o /db/dssp/1qrx.dssp
 """
-try:
-    raw_dssp = sh.Command(DSSP_BIN)
-except sh.CommandNotFound:
-    def raw_dssp(*args, **kwargs):
-        raise NotImplementedError("DSSP not available")
+raw_dssp = locate_subprocess_binary(DSSP_NAME, DSSP_BIN)
 
 
 """:
@@ -92,11 +107,7 @@ except sh.CommandNotFound:
             Read point list from POINTFILE
         -H  Print header
 """
-try:
-    raw_featurize = sh.Command(FEATURIZE_BIN)
-except sh.CommandNotFound:
-    def raw_featurize(*args, **kwargs):
-        raise NotImplementedError("FEATURE not available. Try setting FEATURE_ROOT or FEATURE_BIN")
+raw_featurize = locate_subprocess_binary('featurize', FEATURIZE_BIN)
 
 
 def generate_dssp_file(pdb_file, dssp_file=None,
@@ -159,6 +170,10 @@ def featurize(shells=None,
 
     if environ is None:
         environ = default_environ
+    
+    for variable in REQUIRED_ENVIRONMENT:
+        if variable not in environ or not os.path.exists(environ.get(variable)):
+            raise RuntimeError("Required environmental variable {} not available".format(variable))
 
     exec_params['_env'] = environ
 
@@ -175,13 +190,28 @@ def featurize(shells=None,
     if working_dir is not None:
         exec_params['_cwd'] = working_dir
 
+    likely_problems = any(var not in environ for var in ('PDB_DIR', 'DSSP_DIR', 'FEATURE_DIR'))
+
     if with_errors:
         errors = StringIO()
         exec_params['_err'] = errors
+        exec_params['_ok_code'] = range(255)  # Allow all errors
         results = raw_featurize(*exec_args, **exec_params)
         errors_log = errors.getvalue()
         errors.close()
         return results, errors_log
+    elif likely_problems:
+        errors = StringIO()
+        exec_params['_err'] = errors
+        exec_params['_ok_code'] = range(255)  # Allow all errors
+        try:
+            results = raw_featurize(*exec_args, **exec_params)
+            ok = results.exit_code
+        except sh.ErrorReturnCode:
+            errors_log = errors.getvalue()
+            raise RuntimeError(errors_log)
+        else:
+            return results
     else:
         if '_err' not in exec_params:
             exec_params['_err'] = os.devnull

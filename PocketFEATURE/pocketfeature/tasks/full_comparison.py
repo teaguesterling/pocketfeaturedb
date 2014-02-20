@@ -27,7 +27,7 @@ from pocketfeature.tasks.align import (
     align_scores_greedy,
     align_scores_munkres,
 )
-from pocketfeature.tasks.visualize import create_visualizations
+from pocketfeature.tasks.visualize import create_alignment_visualizations
 from pocketfeature.utils.pdb import guess_pdbid_from_stream
 
 from pocketfeature.utils.args import LOG_LEVELS
@@ -85,13 +85,13 @@ class ComparePockets(Task):
         pocketA = create_pocket_around_ligand(structureA, ligandA, cutoff=params.distance)
         if params.ptfA is not None:
             log.debug("Writing pocket A")
-            pointfile.dump(pocketA.points, params.pftA)
+            pointfile.dump(pocketA.points, params.ptfA)
             params.ptfA.close()
         log.debug("Creating pocket B")
         pocketB = create_pocket_around_ligand(structureB, ligandB, cutoff=params.distance)
         if params.ptfB is not None:
             log.debug("Writing pocket B")
-            pointfile.dump(pocketB.points, params.pftB)
+            pointfile.dump(pocketB.points, params.ptfB)
             params.ptfB.close()
     
         log.info("FEATURIZING Pockets")
@@ -126,7 +126,7 @@ class ComparePockets(Task):
         log.info("Alignment Score: {0}".format(total_score))
 
         log.info("Creating PyMol scripts")
-        scriptA, scriptB = create_visualizations(pocketA.points, 
+        scriptA, scriptB = create_alignment_visualizations(pocketA.points, 
                                                  pocketB.points, 
                                                  alignment,
                                                  pdbA=params.pdbA.name,
