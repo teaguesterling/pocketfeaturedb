@@ -231,6 +231,12 @@ class filemap(keydefaultdict):
         self.opener = open
         super(filemap, self).__init__(self.get_file_for)
         self.root = root
+
+    def __enter__(self):
+        return self
+    
+    def __exit(self):
+        self.close()
     
     def get_path_for(self, obj):
         name = self.name_factory(obj)

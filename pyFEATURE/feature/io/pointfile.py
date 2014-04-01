@@ -59,7 +59,11 @@ def dump(pointlist, io):
     for point in pointlist:
         if point.comment:
             tpl = COMMENT_LINE
-            line = (point.pdbid, point.x, point.y, point.z, point.comment)
+            if isinstance(point.comment, (tuple, list)):  # Multiple comments:
+                comment = "\t#\t".join(point.comment)
+            else:
+                comment = point.comment
+            line = (point.pdbid, point.x, point.y, point.z, comment)
         else:
             tpl = NON_COMMENT_LINE
             line = (point.pdbid, point.x, point.y, point.z)

@@ -11,6 +11,27 @@ import itertools
 from common import attempt_cast
 
 LINE_TEMPLATE = "# {0}\t{1}"
+CONTAINER_TYPES = (list, set, dict)
+
+
+def _update_value(existing, value):
+    if existing is None:
+        return value
+
+    if isinstance(existing, CONTAINER_TYPES):
+        if not isinstance(value, CONTAINER_TYPES):
+            value = [value]
+        if hasattr(existing, 'extend'):
+            existing.extend(value)
+        elif hasattr(existing, 'update'):
+            existing.update(value)
+        else:
+            raise ValueError("Can't update container type {}".format(existing_type))
+        return existing
+    else:
+        existing_type = type(existing)
+        value = existing_type(value)
+        return value
 
 
 class MetaData(OrderedDict):
@@ -27,20 +48,8 @@ class MetaData(OrderedDict):
 
     def modify(self, key, value):
         existing = self[key]
-        existing_type = type(self[key])
-        value_type = type(value)
-        if not (isinstance(value, existing_type)\
-             or isinstance(existing, value_type)):
-            if isinstance(existing, (list, set, dict)):
-                value = [value]
-            else:
-                value = existing_type(value)
-        if hasattr(existing, 'extend'):
-            existing.extend(value)
-        elif hasattr(existing, 'update'):
-            existing.update(value)
-        else:
-            self[key] = value
+        changed = _update_value(existing, value)
+        self[key] = changed
         return self[key]
 
     def set_raw(self, key, value):
@@ -55,7 +64,7 @@ class MetaData(OrderedDict):
             existing_type = type(existing)
             if not isinstance(existing, (list, set, dict)):
                 value = existing_type(value)
-        elif isinstance(value, list):
+        elif isinstance(value, CONTAINER_TYPES):
             casts = [attempt_cast(v, default=str) for v in value]
             value = map(operator.itemgetter(1), casts)
         elif isinstance(value, basestring):  # Parsed above
@@ -80,6 +89,25 @@ class MetaData(OrderedDict):
         obj = cls(*args, **kwargs)
         obj.set_raw_fields(fields)
         return obj
+
+    @classmethod
+    def clone_defaults(cls, _extend_lists=True, **changes):
+        new = copy.deepcopy(getattr(cls, 'DEFAULTS', {}))
+        for key, value in changes.iteritems():
+            if key in new and _extend_lists:
+                existing = new[key]
+                value = _update_value(existing, value)
+            new[key] = value
+        return new
+
+
+    @classmethod
+    def clone_defaults_extend(cls, **changes):
+        return cls.clone_defaults(_extend_lists=True, **changes)
+
+    @classmethod
+    def clone_defaults_overwrite(cls, **changes):
+        return cls.clone_defaults(_extend_lists=False, **changes)
 
 
 def is_metadata_line(line):

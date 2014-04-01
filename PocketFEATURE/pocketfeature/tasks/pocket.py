@@ -6,16 +6,18 @@ from Bio.PDB.NeighborSearch import NeighborSearch
 
 from feature.io import pointfile
 
-from pocketfeature.io import pdbfile
-from pocketfeature.io import residuefile
+from pocketfeature.io import (
+    pdbfile,
+    residuefile,
+)
+from pocketfeature.pocket import Pocket
+from pocketfeature.residues import DEFAULT_CENTERS
 from pocketfeature.utils.pdb import (
     find_residues_by_id,
     guess_pdbid_from_stream,
     is_het_residue,
     list_ligands,
 )
-from pocketfeature.pocket import Pocket
-from pocketfeature.residues import CENTER_FUNCTIONS
 
 from pocketfeature.tasks.core import Task
 
@@ -23,7 +25,7 @@ from pocketfeature.tasks.core import Task
 def find_neighboring_residues(structure, queries, cutoff=6.0, 
                                                   ordered=True,
                                                   excluded=is_het_residue,
-                                                  residue_points=None):
+                                                  residue_centers=None):
 
     all_atoms = (a for a in structure.get_atoms())
     non_het = (a for a in all_atoms if not excluded(a.get_parent()))
@@ -32,13 +34,11 @@ def find_neighboring_residues(structure, queries, cutoff=6.0,
     for query in queries:  # Search through query points
         found = neighbors.search(query, cutoff, 'R')  # Search of Residues
         found = (res for res in found if not excluded(res))  # Possibly redundant
-        if residue_points is None:
+        if residue_centers is None:  # If adding any points
             residues.add(found)
         else:  # Check if any active sites are within cutuff
             for residue in found:
-                points = residue_points(residue)
-                points = points if points is not None else []
-                points = [point for point in points if point is not None]
+                points = [point for code, point in residue_centers(residue)]
                 meets_cutoff = (norm(query - pt) <= cutoff for pt in points)
                 if any(meets_cutoff):
                     residues.add(residue)
@@ -50,17 +50,17 @@ def find_neighboring_residues(structure, queries, cutoff=6.0,
 
 def create_pocket_around_ligand(structure, ligand, cutoff=6.0, 
                                                    name=None,
-                                                   residue_points=CENTER_FUNCTIONS, 
+                                                   residue_centers=DEFAULT_CENTERS, 
                                                    **options):
     points = [atom.get_coord() for atom in ligand]
     residues = find_neighboring_residues(structure, points, cutoff=cutoff, 
                                                             ordered=True, 
                                                             excluded=is_het_residue, 
-                                                            residue_points=residue_points)
+                                                            residue_centers=residue_centers)
     pocket = Pocket(residues, pdbid=structure.get_id(),
                               defined_by=ligand,
                               name=name,
-                              residue_points=residue_points)
+                              residue_centers=residue_centers)
     return pocket
 
 
@@ -107,6 +107,11 @@ class PocketFinder(Task):
 
         pocket = create_pocket_around_ligand(structure, ligand, cutoff=params.distance)
 
+        if len(pocket.residues) == 0:
+            print("Error: No residues found within {0} angstroms of {1}".format(params.distance, ligand),
+                    file=params.log)
+            return -1
+
         if params.print_residues:
             residuefile.dump(pocket.residues, params.output)
         elif params.print_pointfile:
@@ -143,7 +148,7 @@ class PocketFinder(Task):
         parser.add_argument('--log', metavar='LOG',
                                      type=FileType,
                                      default=stderr,
-                                     help='Path to log errors [default: %(default)s]')
+                                     help='Path to log errors [default: STDERR]')
         parser.add_argument('-d', '--distance', metavar='CUTOFF',
                                               type=float,
                                               default=cls.LIGAND_RESIDUE_DISTANCE,

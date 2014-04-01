@@ -8,14 +8,8 @@ class Task(object):
 
     def __init__(self, params):
         self.params = params
-        try:
-            self.output = params.output
-        except AttributeError:
-            self.output = sys.stdout
-        try:
-            self.log = params.log
-        except AttributeError:
-            self.log = sys.stdout
+        self.output = getattr(params, 'output', sys.stdout)
+        self.log = getattr(params, 'log', sys.stderr)
 
     @classmethod
     def task_name(cls):

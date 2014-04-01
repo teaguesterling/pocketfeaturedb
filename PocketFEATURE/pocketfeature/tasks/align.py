@@ -1,14 +1,16 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
+import itertools
+
 from pocketfeature.algorithms import (
     greedy_align,
     munkres_align,
 )
 from pocketfeature.io import matrixvaluesfile
 from pocketfeature.io.matrixvaluesfile import MatrixValues
-
 from pocketfeature.tasks.core import Task
+
 
 def align_scores_munkres(scores, cutoff):
     score_matrix = scores.to_array()

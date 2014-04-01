@@ -28,49 +28,28 @@ def _get_value_columns(values, accepted, cast):
         return len(values), values
     
 
-def load(io, dims=2, delimiter=None, columns=None, cast=None, make_key=tuple):
-    positions = []
-    indexes = [Indexer() for i in range(dims)]
-    columns = list(columns) if columns is not None else None
-    cast = cast if cast is not None else lambda x: x
-    value_count = 0
-    for entry in io:
-        keys, values = _parse_entry(entry, dims=dims, delimiter=delimiter)
-        num_values, values = _get_value_columns(values, columns, cast)
-        keys = make_key(keys)
-        value_count = max(value_count, num_values)
-        for i, index in enumerate(indexes):
-            index.add(keys[i])
-        positions.append((keys, values))
-
-    return MatrixValues(positions, indexes, value_dims=value_count)
-
-
-def dump(matrix_values, io, delimiter="\t", columns=None):
-    columns = set(columns) if columns is not None else None
-    for key, values in matrix_values.iteritems():
-        if matrix_values.value_dims == 1:
-            values = (values,)
-        if columns is not None:
-            values = [item for i, item in enumerate(values) if i in columns]
-        row = list(key) + map(str, values)
-        print(delimiter.join(row), file=io)
-
-
-def dumps(values, delimiter="\t", columns=None):
-    buf = StringIO()
-    dump(values, buf, delimiter=delimiter, columns=columns)
-    return buf.getvalue()
-
-
 class MatrixValues(OrderedDict):
     """ A cheap attempt at storing sparse matrix information """    
-    def __init__(self, entries=[], indexes=None, value_dims=1):
+    def __init__(self, entries=[], indexes=None, value_dims=None):
         if indexes is None:
             indexes = []
         self.indexes = indexes 
         super(MatrixValues, self).__init__(entries)
+        # Try to guess correct "shape" from first provided key
+        if value_dims is None:
+            some_key = self.keys()[0]
+            if isinstance(self[some_key], (list, tuple)):
+                value_dims = len(self[some_key])
+            else:
+                value_dims = 1
+            dim_refs = {}
+        elif isinstance(value_dims, (list, tuple)):
+            dim_refs = dict(reversed(pair) for pair in enumerate(value_dims))
+            value_dims = len(value_dims)
+        else:
+            dim_refs = {}
         self.value_dims = value_dims
+        self.dim_refs = dim_refs
         self.shape = [len(dim) for dim in indexes]
         self.shape = self.shape + [self.value_dims]
 
@@ -98,8 +77,10 @@ class MatrixValues(OrderedDict):
             matrix[coords] = value
         return matrix
 
-    def slice_values(self, index, value_dims=1):
+    def slice_values(self, index, value_dims=None):
         cls = type(self)
+        if index in self.dim_refs:
+            index = self.dim_refs[index]
         items = ((k, v[index]) for k, v in self.iteritems())
         values = cls(items, value_dims=value_dims)
         return values
@@ -111,6 +92,7 @@ class MatrixValues(OrderedDict):
         return values
 
     def subset_from_indexes(self, subset):
+        """ Create a new matrixvaluesfile from a subset of keys """
         cls = type(self)
         indexes = [index.flip() for index in self.indexes]
         items = []
@@ -134,7 +116,7 @@ class MatrixValues(OrderedDict):
         return 'MatrixValues({0})'.format(repr(self.items()))
 
 
-class PassThoughMatrixValues(object):
+class PassThroughItems(object):
     def __init__(self, entries=[], indexes=None, value_dims=None):
         self.indexes = indexes
         self.value_dims = value_dims
@@ -145,3 +127,40 @@ class PassThoughMatrixValues(object):
 
     def iteritems(self):
         return self.entries
+
+
+def load(io, dims=2, delimiter=None, columns=None, cast=None, make_key=tuple):
+    positions = []
+    indexes = [Indexer() for i in range(dims)]
+    columns = list(columns) if columns is not None else None
+    cast = cast if cast is not None else lambda x: x
+    value_count = 0
+    for entry in io:
+        keys, values = _parse_entry(entry, dims=dims, delimiter=delimiter)
+        num_values, values = _get_value_columns(values, columns, cast)
+        keys = make_key(keys)
+        value_count = max(value_count, num_values)
+        for i, index in enumerate(indexes):
+            index.add(keys[i])
+        positions.append((keys, values))
+
+    return MatrixValues(positions, indexes, value_dims=value_count)
+
+
+def dump(matrix_values, io, delimiter="\t", columns=None, tpl="{:.3f}"):
+    columns = set(columns) if columns is not None else None
+    for key, values in matrix_values.iteritems():
+        if matrix_values.value_dims == 1:
+            values = (values,)
+        if columns is not None:
+            values = [item for i, item in enumerate(values) if i in columns]
+        row = list(key) + map(tpl.format, values)
+        print(delimiter.join(row), file=io)
+
+
+def dumps(values, delimiter="\t", columns=None, tpl="{:f}"):
+    buf = StringIO()
+    dump(values, buf, delimiter=delimiter, columns=columns, tpl=tpl)
+    return buf.getvalue()
+
+

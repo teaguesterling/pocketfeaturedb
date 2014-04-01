@@ -3,48 +3,39 @@ from __future__ import print_function
 
 import gzip
 import itertools
+import os
 
-from feature.io import featurefile
 from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity, 
     Indexer,
     normalize_score,
 )
-from pocketfeature.io import backgrounds
-from pocketfeature.io import matrixvaluesfile
-from pocketfeature.io.matrixvaluesfile import PassThoughMatrixValues
-from pocketfeature.utils.ff import (
-    get_vector_description,
-    vectors_descriptions_in_file,
+from pocketfeature.io import (
+    backgrounds,
+    featurefile,
+    matrixvaluesfile,
 )
+from pocketfeature.io.backgrounds import make_allowed_pair_sets
+from pocketfeature.io.matrixvaluesfile import PassThroughItems
 
 from pocketfeature.tasks.core import Task
-
-
-def score_featurefiles(background, file1, file2):
-    pairs = itertools.product(file1.vectors, file2.vectors)
-    for vector1, vector2 in pairs:
-        name1 = get_vector_description(vector1)
-        name2 = get_vector_description(vector2)
-        key = (name1, name2)
-        scores = background.normalized_tanimoto_similarity(vector1, vector2)
-        yield key, scores
 
 
 class FeatureFileCompare(Task):
     BACKGROUND_FF_DEFAULT = 'background.ff'
     BACKGROUND_COEFF_DEFAULT = 'background.coeffs'
+
     def run(self):
         params = self.params
-        stat_background = backgrounds.load(stats_file=params.background, 
-                                           norms_file=params.normalization,
-                                           compare_function=cutoff_tanimoto_similarity,
-                                           normalize_function=normalize_score)
+        background = backgrounds.load(stats_file=params.background, 
+                                      norms_file=params.normalization,
+                                      allowed_pairs=params.allowed_pairs)
         features1 = featurefile.load(params.features1)
         features2 = featurefile.load(params.features2)
-        scores = score_featurefiles(stat_background, features1, features2)
-        wrapper = PassThoughMatrixValues(scores)
-        matrixvaluesfile.dump(wrapper, params.output)
+        # Compute scores and store directly (no matrix representation)
+        scores = background.get_comparison_matrix(features1, features2,
+                                                  matrix_wrapper=PassThroughItems)
+        matrixvaluesfile.dump(scores, params.output)
         return 0
 
     @classmethod
@@ -85,6 +76,10 @@ class FeatureFileCompare(Task):
                                       type=FileType.compressed('r'),
                                       default=background_coeff,
                                       help='Map of normalization coefficients for residue type pairs [default: %(default)s]')
+        parser.add_argument('-p', '--allowed-pairs', metavar='PAIR_SET_NAME',
+                                      choices=backgrounds.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
+                                      default='classes',
+                                      help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
         parser.add_argument('-o', '--output', metavar='VALUES',
                                               type=FileType.compressed('w'),
                                               default=stdout,

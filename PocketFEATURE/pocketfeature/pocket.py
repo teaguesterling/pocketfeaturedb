@@ -2,11 +2,8 @@
 
 from feature.io.pointfile import PDBPoint
 
-from pocketfeature.utils.ff import (
-    residue_code_three_to_one,
-    residue_to_typecode,
-)
-from pocketfeature.residues import CENTER_FUNCTIONS
+from pocketfeature.utils.ff import residue_code_three_to_one
+from pocketfeature.residues import DEFAULT_CENTERS
 
 
 class Pocket(object):
@@ -18,12 +15,12 @@ class Pocket(object):
     def __init__(self, residues, pdbid=None,
                                  defined_by=None,
                                  name=None,
-                                 residue_points=CENTER_FUNCTIONS):
+                                 residue_centers=DEFAULT_CENTERS):
         self._pdbid = pdbid
         self._residues = residues
         self._defined_by = defined_by
         self._name = name
-        self._getResidueCenters = residue_points
+        self._centers = residue_centers
 
     @property
     def pdbid(self):
@@ -45,9 +42,9 @@ class Pocket(object):
     def points(self):
         for residue in self.residues:
             pdbid = self._getResiduePdb(residue)
-            points = self._getResidueCenters(residue)
-            for i, point in enumerate(points, 1):
-                comment = self._getResidueComment(residue, i)
+            points = self._centers(residue)
+            for point_type, point in points:
+                comment = self._getResidueComment(residue, point_type)
                 yield PDBPoint(*point, pdbid=pdbid, comment=comment)
 
     @property
@@ -65,8 +62,12 @@ class Pocket(object):
 
         return (self.pdbid, ligchain, lignum, ligname)
 
-    def setResidueCenters(self, residue_points):
-        self._getResidueCenters = residue_points
+    @property
+    def signature_string(self):
+        return "_".join(map(str, self.signature))
+
+    def setResidueCenters(self, residue_centers):
+        self._centers = residue_centers
 
     def _getResiduePdb(self, residue):
         if self.pdbid is not None:
@@ -74,18 +75,14 @@ class Pocket(object):
         else:
             return residue.get_full_id()[0]
 
-    def _getResidueComment(self, residue, idx=1):
+    def _getResidueComment(self, residue, point_type):
         respdbid, resmodel, reschain, resid = residue.get_full_id()
         reshet, resnum, resins = resid
         resname = residue.get_resname().upper()
-        try:
-            resletter = residue_code_three_to_one(resname)
-        except KeyError:
-            resletter = '?'
-        point_id = self.signature + (resnum, resletter, idx, reschain)
-        point_id_text =  "_".join([str(token).strip() for token in point_id])
-        point_type_text = residue_to_typecode(residue, idx)
+        resletter, idx = point_type
+        res_sig = "_".join(str(x).strip() for x in (resnum, resletter, idx, reschain))
+        point_sig = self.signature_string + '_' + res_sig
 
-        return " ".join((point_id_text, point_type_text))
+        return "\t#\t".join((point_sig, point_type))
 
 

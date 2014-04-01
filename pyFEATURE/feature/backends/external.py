@@ -39,6 +39,11 @@ PROTEIN_DB_DIR = os.environ.get('PROTEIN_DB_DIR', os.path.join(os.getcwd(), 'db'
 DEFAULT_PDB_DIR = os.environ.get('PDB_DIR', os.path.join(PROTEIN_DB_DIR, 'pdb'))
 DEFAULT_DSSP_DIR = os.environ.get('DSSP_DIR', os.path.join(PROTEIN_DB_DIR, 'dssp'))
 
+ORIGINAL_PATH = os.environ.get('PATH')
+AUGMENTED_PATH = os.pathsep.join((FEATURE_BIN, 
+                                  FEATURE_TOOLS_BIN,
+                                  ORIGINAL_PATH))
+
 """:
     A modified environment within which all FEATURE scripts should be run.
     This sets environmental variables expected by the FEATURE binaries
@@ -48,7 +53,7 @@ default_environ = os.environ.copy()
 default_environ.update({
     # Add external script path to environment PATH so external scripts
     # can find 'featurize'
-    'PATH': os.pathsep.join((FEATURE_BIN, default_environ.get("PATH"))),
+    'PATH': AUGMENTED_PATH,
 
     # Where to find FEATURE parameter files
     'FEATURE_DIR': FEATURE_DATA_DIR,
@@ -59,14 +64,18 @@ default_environ.update({
     'DSSP_DIR': DEFAULT_DSSP_DIR,  # Default DSSP Dir (To Override)
 })
 
+raw_which = sh.Command('which')
 
-def locate_subprocess_binary(name, expected_path, raise_error=True):
+
+def locate_subprocess_binary(name, expected_path, raise_error=True, 
+                                                  environ=default_environ):
     try:
         if os.path.exists(expected_path):
             return sh.Command(expected_path)
         else:
-            return sh.Command(name)
-    except sh.CommandNotFound:
+            found_path = raw_which(name, _env=environ)
+            return sh.Command(found_path)
+    except (sh.CommandNotFound, sh.ErrorReturnCode):
         def error(*args, **kwargs):
             raise NotImplementedError("{0} not available in {1}".format(
                 name, os.environ.get('PATH', [])))
@@ -84,7 +93,7 @@ def locate_subprocess_binary(name, expected_path, raise_error=True):
       -o OUTFILE: DSSP
     Ex: -i /db/pdb/1qhx.pdb -o /db/dssp/1qrx.dssp
 """
-raw_dssp = locate_subprocess_binary(DSSP_NAME, DSSP_BIN)
+raw_dssp = locate_subprocess_binary(DSSP_NAME, DSSP_BIN, raise_error=False)
 
 
 """:

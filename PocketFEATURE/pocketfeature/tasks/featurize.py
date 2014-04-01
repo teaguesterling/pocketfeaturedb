@@ -4,7 +4,17 @@ from __future__ import print_function
 import os
 import sys
 
+from feature.backends.wrappers import featurize_points_raw
+
+from pocketfeature.io import featurefile
 from pocketfeature.tasks.core import Task
+
+
+def featurize_points(pointslist, featurize_args={}, **kwargs):
+    data = featurize_points_raw(pointslist, **featurize_args)
+    ff = featurefile.load(data, **kwargs)
+    return ff
+
 
 def update_environ_from_namespace(environ, namespace):
     if namespace.feature_root is not None:
@@ -37,6 +47,13 @@ def extract_feature_args_from_namespace(namespace):
     if namespace.s is not None:
         kwargs['search_in'] = namespace.s
     return args, kwargs
+
+
+def namespace_from_dict(data):
+    namespace = object()
+    for key, value in data.items():
+        setattr(namespace, key, value)
+    return namespace
 
 
 class Featurize(Task):

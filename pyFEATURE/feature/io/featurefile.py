@@ -27,6 +27,14 @@ class PropertyMismatchError(Exception):
 
 COORDINANTS = 'COORDINANTS'
 DESCRIPTION = 'DESCRIPTION'
+REAL_NAME = 'REAL_NAME'
+
+
+def rename_vector_from_comment(vector, comment):
+    if vector.has_named_comment(comment):
+        new_name = vector.get_named_comment(comment)
+    vector.name = new_name
+    return vector
 
 
 class FeatureMetaData(MetaData):
@@ -45,6 +53,7 @@ class FeatureMetaData(MetaData):
     def __init__(self, items=[], *args, **kwargs):
         kwargs.setdefault('defaults', self.DEFAULTS)
         super(FeatureMetaData, self).__init__(items, *args, **kwargs)
+        self.names_comment = None
 
     @property
     def _has_coords_comment(self):
@@ -66,6 +75,12 @@ class FeatureMetaData(MetaData):
     def get_property_index(self, name):
         """ Find the index of a specific property in the property list """
         return self.properties.index(name)
+
+    def set_name_override_comment(self, comment):
+        if comment in self.comments:
+            self.names_comment = comment
+        else:
+            raise ValueError("Cannot rename FEATURE vectors to non-existent comment: {0}".format(comment))
 
     @property
     def properties_dtype(self):
@@ -138,6 +153,8 @@ class FeatureVector(object):
         # This is an approximate method
         if 'PDB' in self.comments:
             return self.get_named_comment('PDB')
+        elif 'PDBID_LIST' in self.comments:
+            return self.get_named_comment('PDBID_LIST')
         elif 'PDBID' in self.comments:
             return self.get_named_comment('PDBID')
         elif self.name.startswith('Env_'):
@@ -216,7 +233,8 @@ class FeatureVectorCollection(list):
 
 class ForwardFeatureFile(object):
     """ A lazy FEATURE file container  intended for iterating over large files """
-    def __init__(self, metadata=None, vectors=[]):
+    def __init__(self, metadata=None, vectors=[], 
+                       set_name_from_comment=None):
         if metadata is None:
             metadata = FeatureMetaData()
 
@@ -271,29 +289,41 @@ class FeatureFile(ForwardFeatureFile):
         return self.vectors.get_by_name(name)
 
 
-def iload(src, container=ForwardFeatureFile, metadata=None):
+def iload(src, container=ForwardFeatureFile, metadata=None, rename_from_comment=None):
     """ Create a lazy-loading FEATURE file from a stream """
     if metadata is None:
         metadata = FeatureMetaData()
     metadata, body = extract_metadata(src, container=metadata.set_raw_fields)
+    if rename_from_comment:
+        metadata.set_name_override_comment(rename_from_comment)
     parsed_vectors = _load_vectors_using_metadata(metadata, body)
     return container(metadata, parsed_vectors)
 
 
-def load(src, container=FeatureFile, metadata=None):
+def load(src, container=FeatureFile, metadata=None, rename_from_comment=None):
     """ Create a FEATURE file from a stream """
-    return iload(src, container=container, metadata=metadata)
+    return iload(src, container=container, 
+                      metadata=metadata,
+                      rename_from_comment=rename_from_comment)
 
 
-def loads(src, container=FeatureFile, metadata=None):
+def loads(src, container=FeatureFile, metadata=None, rename_from_comment=None):
     """ Create a FEATURE file from a string """
-    return load(src.splitlines(), container=container, metadata=metadata)
+    return load(src.splitlines(), container=container, 
+                                  metadata=metadata,
+                                  rename_from_comment=rename_from_comment)
 
 
 def dump(data, io):
     """ Write  a FEATURE file to a stream """
     dump_metadata(data.metadata, io)
-    _dump_vectors_using_metadata(data.meatdata, data.vectors, io)
+    _dump_vectors_using_metadata(data.metadata, data.vectors, io)
+
+
+def dump_vector(vector, io, include_metadata=False):
+    if include_metadata:
+        dump_metadata(vector.metadata, io)
+    _dump_vectors_using_metadata(vector.metadata, [vector], io)
 
 
 def dumps(data):
@@ -320,6 +350,14 @@ def _load_vectors_using_metadata(metadata, lines):
         coords_at = comment_fields.index(COORDINANTS)
     else:
         coords_at = None
+
+    if metadata.names_comment is not None:
+        name_at = comment_fields.index(metadata.names_comment)
+        if coords_at is not None:
+            name_at -= 1
+    else:
+        name_at = None
+
     for line in lines:
         vector = metadata.create_vector_template()
         components = extract_line_components(line)
@@ -344,6 +382,11 @@ def _load_vectors_using_metadata(metadata, lines):
 
         # Split comments
         vector.comments = [s.strip() for s in comments]
+        
+        if name_at is not None:
+            new_name = vector.comments[name_at]
+            vector.name = new_name
+
         yield vector
 
 
@@ -354,19 +397,14 @@ def _dump_vectors_using_metadata(metadata, vectors, io):
     try:
         coords_at = comment_fields.index(COORDINANTS)
     except ValueError:
-        coords_at = None
+        coords_at = 0
     for vector in vectors:
         print(vector.name, end='\t', file=io)
         print(*vector.features, sep='\t', end='\t', file=io)
-        if coords_at is None and vector.coords is not None:
-            print(*vector.coords, sep='\t', end='\t#\t', file=io)
-            print(*vector.comments, sep='\t#\t', end='\n', file=io)
-        else:
-            tokens = []
-            for idx, comment in vector.comments:
-                if idx == coords_at:
-                    tokens.append("\t".join(vector.coords))
-                else:
-                    tokens.append(comment)
-            print(*tokens, sep='\t#\t', end='\n', file=io)
+        comments = list(vector.comments)
+        if vector.coords is not None:
+            coords_str = "\t".join(['#'] + map("{:.3f}".format, vector.coords))
+            comments.insert(coords_at, coords_str)
+        print(*comments, sep='\t#\t', end='\n', file=io)
+                
 

@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 
-from feature.io.featurefile import DESCRIPTION
 
+from pocketfeature.io.featurefile import (
+    DESCRIPTION,
+    RESIDUE_TYPE,
+)
 from pocketfeature.utils.pdb import (
     residue_code_one_to_three,
     residue_code_three_to_one,
@@ -37,19 +40,13 @@ def vectors_descriptions_in_file(feature_file, comment_field=DESCRIPTION):
     return desc
 
 
-def get_vector_type(vector, comment_field=DESCRIPTION):
+def get_vector_type(vector, comment_field=RESIDUE_TYPE):
     """ Given a DESCRIPTION comment like "2R6J_A_401_NDP_312_A_1_A A1"
         Extracts the A1 part unless the first character is not a valid
         one letter residue code
     """
-    comment = vector.get_named_comment(comment_field)
-    typecode = typecode_from_comment(comment)
-    restype = typecode[0]
-    try:
-        residue_code_one_to_three(restype)
-        return typecode
-    except KeyError:
-        return None
+    res_type = vector.get_named_comment(comment_field)
+    return res_type
 
 
 def get_vector(vectors, key):

@@ -5,28 +5,27 @@ import logging
 import os
 
 from feature.io import (
-    featurefile,
     pointfile,
 )
-from feature.backends.wrappers import featurize_points
 
 from pocketfeature.io import (
     backgrounds,
+    featurefile,
     matrixvaluesfile,
     pdbfile,
     residuefile,
 )
-from pocketfeature.io.matrixvaluesfile import MatrixValues
+from pocketfeature.io.backgrounds import NORMALIZED_SCORE
 from pocketfeature.tasks.pocket import (
     create_pocket_around_ligand,
     find_ligand_in_structure,
     pick_best_ligand,
 )
-from pocketfeature.tasks.compare import score_featurefiles
 from pocketfeature.tasks.align import (
     align_scores_greedy,
     align_scores_munkres,
 )
+from pocketfeature.tasks.featurize import featurize_points
 from pocketfeature.tasks.visualize import create_alignment_visualizations
 from pocketfeature.utils.pdb import guess_pdbid_from_stream
 
@@ -46,12 +45,14 @@ class ComparePockets(Task):
         log = logging.getLogger('pocketfeature')
         log.setLevel(LOG_LEVELS.get(params.log_level, 'debug'))
 
+
         log.info("Loading background")
+        log.debug("Allowed residue pairs: {0}".format(params.allowed_pairs)) 
         background = backgrounds.load(stats_file=params.background,
-                                      norms_file=params.normalization)
+                                      norms_file=params.normalization,
+                                      allowed_pairs=params.allowed_pairs)
 
         log.info("Loading PDBs")
-
         log.debug("Extracting PDBIDs")
         pdbidA, pdbA = guess_pdbid_from_stream(params.pdbA)
         pdbidB, pdbB = guess_pdbid_from_stream(params.pdbB)
@@ -96,35 +97,53 @@ class ComparePockets(Task):
     
         log.info("FEATURIZING Pockets")
         log.debug("FEATURIZING Pocket A")
-        featurefileA = featurize_points(pocketA.points)
+        featurefileA = featurize_points(pocketA.points, 
+                                        rename_from_comment='DESCRIPTION')
+        _numA = len(featurefileA.vectors)
         if params.ffA is not None:
             log.debug("Wring FEATURE file A")
             featurefile.dump(featurefileA, params.ffA)
             params.ffA.close()
         log.debug("FEATURIZING Pocket B")
-        featurefileB = featurize_points(pocketB.points)
+        featurefileB = featurize_points(pocketB.points,
+                                        rename_from_comment='DESCRIPTION')
+        _numB = len(featurefileB.vectors)
         if params.ffB is not None:
             log.debug("Wring FEATURE file B")
             featurefile.dump(featurefileB, params.ffB)
             params.ffB.close()
     
         log.info("Comparing Vectors")
-        scores_iter = score_featurefiles(background, featurefileA, featurefileB)
-        scores = MatrixValues(scores_iter, value_dims=2)
-        if params.scores is not None:
+        scores = background.get_comparison_matrix(featurefileA, featurefileB)
+        _num_scores = len(scores)
+        log.info("Scored {0} vectors (out of {1}x{2}={3} total)".format(
+                    _num_scores,
+                    _numA,
+                    _numB,
+                    _numA * _numB))
+        if params.raw_scores is not None:
             log.debug("Writing scores")
-            matrixvaluesfile.dump(scores, params.scores)
-            params.scores.close()
-        normalized = scores.slice_values(1)  # Normalized in second position
+            matrixvaluesfile.dump(scores, params.raw_scores)
+            params.raw_scores.close()
+        normalized = scores.slice_values(NORMALIZED_SCORE)
 
         log.info("Aligning Pockets")
         alignment = align_scores_greedy(normalized, cutoff=params.cutoff)
+        log.debug("Aligned {0} points".format(len(alignment)))
         total_score = sum(alignment.values())
         alignment_with_raw_scores = scores.subset_from_keys(alignment.keys())
-
-        matrixvaluesfile.dump(alignment, params.output)
+        
+        if params.alignment is not None:
+            log.debug("Writing alignment")
+            matrixvaluesfile.dump(alignment, params.alignment)
+            params.alignment.close()
+            
         log.info("Alignment Score: {0}".format(total_score))
-
+        print("{0}\t{1}\t{2:0.5f}".format(pocketA.signature_string,
+                                          pocketB.signature_string,
+                                          total_score),
+              file=params.output)
+        
         log.info("Creating PyMol scripts")
         scriptA, scriptB = create_alignment_visualizations(pocketA.points, 
                                                  pocketB.points, 
@@ -147,6 +166,7 @@ class ComparePockets(Task):
         from pocketfeature.utils.args import (
             decompress,
             FileType,
+            ProteinFileType,
         )
         background_ff = cls.BACKGROUND_FF_DEFAULT
         background_coeff = cls.BACKGROUND_COEFF_DEFAULT
@@ -162,10 +182,10 @@ class ComparePockets(Task):
 
         parser = ArgumentParser("Identify and extract pockets around ligands in a PDB file")
         parser.add_argument('pdbA', metavar='PDBA', 
-                                    type=FileType.compressed('r'),
+                                    type=ProteinFileType.compressed('r'),
                                     help='Path to first PDB file')
         parser.add_argument('pdbB', metavar='PDBB', 
-                                    type=FileType.compressed('r'),
+                                    type=ProteinFileType.compressed('r'),
                                     help='Path to second PDB file')
         parser.add_argument('--ligandA', metavar='LIGA',
                                          type=str,
@@ -185,7 +205,11 @@ class ComparePockets(Task):
                                       type=FileType.compressed('r'),
                                       default=background_coeff,
                                       help='Map of normalization coefficients for residue type pairs [default: %(default)s')
-        parser.add_argument('-d', '--distance', metavar='CUTOFF',
+        parser.add_argument('-p', '--allowed-pairs', metavar='PAIR_SET_NAME',
+                                      choices=backgrounds.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
+                                      default='classes',
+                                      help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
+        parser.add_argument('-d', '--distance', metavar='DISTANCE',
                                               type=float,
                                               default=cls.LIGAND_RESIDUE_DISTANCE,
                                               help='Residue active site distance threshold [default: %(default)s]')
@@ -193,10 +217,10 @@ class ComparePockets(Task):
                                               type=float,
                                               default=cls.DEFAULT_CUTOFF,
                                               help='Minium score (cutoff) to align [default: %(default)s')
-        parser.add_argument('-o', '--output', metavar='ALIGNMENT',
-                                              type=FileType.compressed('w'),
+        parser.add_argument('-o', '--output', metavar='RESULTS',
+                                              type=FileType.compressed('a'),
                                               default=stdout,
-                                              help='Path to alignment file [default: STDOUT]')
+                                              help='Path to results file [default: STDOUT]')
         parser.add_argument('--ptfA', metavar='PTFA',
                                       type=FileType.compressed('w'),
                                       default=None,
@@ -217,11 +241,16 @@ class ComparePockets(Task):
                                      default=None,
                                      nargs='?',
                                      help='Path to second FEATURE file [default: None]')
-        parser.add_argument('--scores', metavar='SCORES',
-                                        type=FileType.compressed('w'),
-                                        default=None,
-                                        nargs='?',
-                                        help='Path to scores file [default: None]')
+        parser.add_argument('--raw-scores', metavar='SCORES',
+                                            type=FileType.compressed('w'),
+                                            default=None,
+                                            nargs='?',
+                                            help='Path to raw scores file [default: None]')
+        parser.add_argument('--alignment', metavar='ALIGNMENT',
+                                            type=FileType.compressed('w'),
+                                            default=None,
+                                            nargs='?',
+                                            help='Path to alignment file [default: None]')
         parser.add_argument('--pymolA', metavar='PYMOLA',
                                      type=FileType('w'),
                                      default=None,
