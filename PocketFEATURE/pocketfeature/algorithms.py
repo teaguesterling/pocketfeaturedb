@@ -36,6 +36,12 @@ def normalize_score(score, mode):
     return 2 / (1 + (score / mode) ** 2) - 1
 
 
+def unique_product(p, q, skip=0):
+    for i, x in enumerate(p, start=skip):
+        for y in q[i:]:
+            yield x,y
+
+
 #def munkres(costs, maximize=False):
 #    N, M = costs.shape
 #
@@ -179,7 +185,10 @@ class GaussianStats(object):
 
     @property
     def variance(self):
-        return self.m2 / (self.n - 1)
+        if self.n < 2:
+            return np.zeros(self.m2.shape)
+        else:
+            return self.m2 / (self.n - 1)
 
     @property
     def std_dev(self):
