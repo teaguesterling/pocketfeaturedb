@@ -68,11 +68,15 @@ def create_alignment_visualizations(pointsA, pointsB, alignment, pdbA=None,
         ligandA = ligand_to_pymol_selector(pointMapA.keys()[0])
         ligandB = ligand_to_pymol_selector(pointMapB.keys()[0])
 
+        scores = alignment.values()
+        scores = [-score for score in scores]  # Lowest are stronger
         if radii is None:
-            scores = alignment.values()
-            minScore, maxScore = min(scores), max(scores)
-            maxScore = max(maxScore, 1)  # prevent divide by zero
-            radii = [score/(maxScore) for score in scores]
+            if len(scores) > 0:
+                minScore, maxScore = min(scores), max(scores)
+                maxScore = max(maxScore, 1)  # prevent divide by zero
+                radii = [score/(maxScore) for score in scores]
+            else:
+                radii = []
         else:
             radii = list(radii)
 
