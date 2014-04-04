@@ -30,10 +30,10 @@ CENTERS = {
     'PRO': [['N', 'CA', 'CB', 'CD', 'CG']],
     'GLN': [['OE1', 'CD', 'NE2']],
     'PHE': [['CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ']],
-    'TRP': [['CD2', 'CE2', 'CE3', 'CZ2', 'CZ3', 'CH2'],
-            ['NE1']],
-    'TYR': [['CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ'],
-            ['OH']],
+    'TRP': [['NE1'],
+            ['CD2', 'CE2', 'CE3', 'CZ2', 'CZ3', 'CH2']],
+    'TYR': [['OH'],
+            ['CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ']],
 }
 
 
@@ -42,12 +42,12 @@ CLASSES = {
     'negative': (('ASP', 0), ('GLU', 0)),
     'polar': (('SER', 0), ('THR', 0), 
               ('ASN', 0), ('GLN', 0), 
-              ('TYR', 1), ('TRP', 1)),
+              ('TYR', 0), ('TRP', 0)),
     'non-polar': (('ALA', 0), ('CYS', 0), 
                   ('GLY', 0), ('ILE', 0), 
                   ('LEU', 0), ('MET', 0), 
                   ('PRO', 0), ('VAL', 0)),
-    'aromatic': (('TYR', 0), ('TRP', 0)),
+    'aromatic': (('TYR', 1), ('TRP', 1), ('PHE', 0)),
 }
 
 
@@ -106,6 +106,7 @@ class CenterCalculator(dict):
         centers = self.centers[key]
         num_centers = len(centers)
         codes = self.get_codes(key, range(num_centers))
+
         # Create reusable function to calculate center point(s)
         def fn(atoms, skip_partial_residues=True):
             strict = self.strict and not skip_partial_residues

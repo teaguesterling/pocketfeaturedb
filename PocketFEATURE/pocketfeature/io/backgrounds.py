@@ -56,6 +56,12 @@ ALLOWED_VECTOR_TYPE_PAIRS = {
 }
 
 
+print(ALLOWED_VECTOR_TYPE_PAIRS)
+print(map(len, ALLOWED_VECTOR_TYPE_PAIRS.values()))
+import sys
+sys.exit()
+
+
 class BackgroundEnvironment(object):
     """ An object containing information about a calculated PocketFEATURE background """
 
