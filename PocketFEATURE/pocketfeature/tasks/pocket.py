@@ -13,6 +13,8 @@ from pocketfeature.io import (
 from pocketfeature.pocket import Pocket
 from pocketfeature.residues import DEFAULT_CENTERS
 from pocketfeature.utils.pdb import (
+    residue_name,
+    find_residues_by_name,
     find_residues_by_id,
     guess_pdbid_from_stream,
     is_het_residue,
@@ -69,11 +71,22 @@ def create_pocket_around_ligand(structure, ligand, cutoff=6.0,
 
 def find_ligand_in_structure(structure, ligand_name, index=0):
     lig_id = residuefile.read_residue_id(ligand_name)
-    found = find_residues_by_id(structure, [lig_id])
+    if isinstance(lig_id, basestring):
+        found = find_residues_by_name(structure, lig_id)
+    else:
+        found = find_residues_by_id(structure, [lig_id])
     if len(found) > index:
         return found[index]
     else:
         return None
+
+
+def find_one_of_ligand_in_structure(structure, ligand_names, index=0):
+    ligands = list_ligands(structure)
+    for ligand in ligands:
+        if residue_name(ligand) in ligand_names:
+            return ligand
+    return None
 
 
 def pick_best_ligand(structure):
@@ -93,16 +106,18 @@ class PocketFinder(Task):
             params.pdbid, params.pdb = guess_pdbid_from_stream(params.pdb)
 
         structure = pdbfile.load(params.pdb, pdbid=params.pdbid)
-        ligand = None
+        ligand = params.ligand
         if params.list_only:
             ligands = list_ligands(structure)
             residuefile.dump(ligands, params.output)
             return 0
         
-        if ligand is None:
+        if not ligand:
             ligand = pick_best_ligand(structure)
+        elif len(ligand) == 1:
+            ligand = find_ligand_in_structure(structure, ligand[0])
         else:
-            ligand = find_ligand_in_structure(structure, params.ligand)
+            ligand = find_one_of_ligand_in_structure(structure, ligand)
         
         if ligand is None:
             print("Error: Could not find ligand in structure", file=params.log)
@@ -137,8 +152,7 @@ class PocketFinder(Task):
                                    help='Path to PDB file [default: STDIN]')
         parser.add_argument('ligand', metavar='LIG',
                                       type=str,
-                                      nargs='?',
-                                      default=None,
+                                      nargs='*',
                                       help='Ligand ID to build pocket around [default: <largest>]')
         parser.add_argument('-i', '--pdbid', metavar='PDBID',
                                       type=str,

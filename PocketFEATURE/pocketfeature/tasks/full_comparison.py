@@ -18,7 +18,7 @@ from pocketfeature.io import (
 from pocketfeature.io.backgrounds import NORMALIZED_SCORE
 from pocketfeature.tasks.pocket import (
     create_pocket_around_ligand,
-    find_ligand_in_structure,
+    find_one_of_ligand_in_structure,
     pick_best_ligand,
 )
 from pocketfeature.tasks.align import (
@@ -66,15 +66,17 @@ class ComparePockets(Task):
             log.debug("Guessing ligand A")
             ligandA = pick_best_ligand(structureA)
         else:
-            log.debug("Searching for ligand A")
-            ligandA = find_ligand_in_structure(structureA, params.ligandA)
+            ligandsA = params.ligandA.split(',')
+            log.debug("Searching for ligand A ({0})".format(" ".join(ligandsA)))
+            ligandA = find_one_of_ligand_in_structure(structureA, ligandsA)
 
         if params.ligandB is None:
             log.debug("Guessing ligand B")
             ligandB = pick_best_ligand(structureB)
         else:
-            log.debug("Searching for ligand B")
-            ligandB = find_ligand_in_structure(structureB, params.ligandB)
+            ligandsB = params.ligandB.split(',')
+            log.debug("Searching for ligand B ({0})".format(" ".join(ligandsB)))
+            ligandB = find_one_of_ligand_in_structure(structureB, ligandsB)
         
         if None in (ligandA, ligandB):
             log.error("Could not find both ligands")

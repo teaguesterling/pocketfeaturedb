@@ -173,7 +173,7 @@ def average_coords(atoms):
 
 
 def find_residues_by_name(structure, name):
-    found = [r for r in structure.get_resiudes() if residue_name(r) == name]
+    found = [r for r in structure.get_residues() if residue_name(r) == name]
     return found
 
 
