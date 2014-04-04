@@ -29,6 +29,8 @@ from pocketfeature.utils.ff import (
 MEAN_VECTOR = 'MEAN'
 STD_DEV_VECTOR = 'STD'
 VAR_VECTOR = 'VAR'
+MIN_VECTOR = 'MIN'
+MAX_VECTOR = 'MAX'
 
 RAW_SCORE = 'raw'
 NORMALIZED_SCORE = 'normalized'
@@ -161,6 +163,13 @@ def load_normalization_data(io, column=0):
     return norms
 
 
+def load_stats_data(io, metadata=None):
+    if metadata is None:
+        metadata = PocketFeatureBackgroundMetaData()
+    stats_ff = featurefile.load(io, metadata=metadata, rename_from_comment=None)
+    return stats_ff
+
+
 def load(stats_file, norms_file, wrapper=BackgroundEnvironment, 
                                  vector_type=get_vector_type,
                                  make_type_key=make_vector_type_key,
@@ -171,9 +180,7 @@ def load(stats_file, norms_file, wrapper=BackgroundEnvironment,
                                  compare_function=cutoff_tanimoto_similarity,
                                  normalize_function=normalize_score,
                                  allowed_pairs=None):
-    if metadata is None:
-        metadata = PocketFeatureBackgroundMetaData()
-    stats_ff = featurefile.load(stats_file, metadata=metadata, rename_from_comment=None)
+    stats_ff = load_stats_data(stats_file, metadata)
     coeffs = load_normalization_data(norms_file, column=norm_mode_column)
 
     metadata = stats_ff.metadata

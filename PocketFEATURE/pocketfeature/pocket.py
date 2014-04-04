@@ -15,12 +15,14 @@ class Pocket(object):
     def __init__(self, residues, pdbid=None,
                                  defined_by=None,
                                  name=None,
-                                 residue_centers=DEFAULT_CENTERS):
+                                 residue_centers=DEFAULT_CENTERS,
+                                 skip_partial_residues=True):
         self._pdbid = pdbid
         self._residues = residues
         self._defined_by = defined_by
         self._name = name
         self._centers = residue_centers
+        self._skip_partial_residues = skip_partial_residues
 
     @property
     def pdbid(self):
@@ -42,7 +44,7 @@ class Pocket(object):
     def points(self):
         for residue in self.residues:
             pdbid = self._getResiduePdb(residue)
-            points = self._centers(residue)
+            points = self._get_microenvironments(residue)
             for point_type, point in points:
                 comment = self._getResidueComment(residue, point_type)
                 yield PDBPoint(*point, pdbid=pdbid, comment=comment)
@@ -65,6 +67,10 @@ class Pocket(object):
     @property
     def signature_string(self):
         return "_".join(map(str, self.signature))
+
+    def _get_microenvironments(self, residue):
+        skip = self._skip_partial_residues
+        return self._centers(residue, skip_partial_residues=skip)
 
     def setResidueCenters(self, residue_centers):
         self._centers = residue_centers

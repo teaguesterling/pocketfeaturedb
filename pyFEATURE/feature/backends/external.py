@@ -224,8 +224,7 @@ def featurize(shells=None,
     else:
         if '_err' not in exec_params:
             exec_params['_err'] = os.devnull
-        results = raw_featurize(*exec_args, **exec_params)
-        return results
+        return raw_featurize(*exec_args, **exec_params)
 
 
 def featurize_pointfile(point_file=None,

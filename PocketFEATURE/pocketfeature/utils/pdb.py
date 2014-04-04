@@ -97,7 +97,7 @@ def guess_pdbid_from_stream(stream):
         except IndexError:
             pdbid = None
     if pdbid is None:
-        pdbid = '???'
+        pdbid = 'UNKN'
     return pdbid, stream
 
 

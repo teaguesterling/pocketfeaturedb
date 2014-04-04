@@ -118,8 +118,9 @@ class PDBReader(object):
 
 def load(io, pdbid=None):
     if pdbid is None:
-        io, pdbid = guess_pdbid_from_stream(io)
+        pdbid, io = guess_pdbid_from_stream(io)
     return PDBReader.fromStream(io, pdbid)
 
-def open_file(path, mode='r', pdbid=None):
+def load_file(path, mode='r', pdbid=None):
     return PDBReader.fromFile(path, pdbid=pdbid)
+

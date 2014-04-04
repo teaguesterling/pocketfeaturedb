@@ -31,6 +31,7 @@ setup(name='PocketFEATURE',
             pf_task_script('featurize:Featurize', 'pf_featurize'),
             pf_task_script('visualize:VisAlign', 'pf_vis'),
             pf_task_script('full_comparison:ComparePockets', 'run_pf'),
+            pf_task_script('build_background:GeneratePocketFeatureBackground', 'pf_genbg'),
         ]
       }
 )

@@ -115,15 +115,29 @@ class FeatureMetaData(MetaData):
     def create_vector_template(self):
         """ Generate an empty FEATURE vector object for the given metadata """
         if COORDINANTS in self.comments:
-            comments = [""] * len(self.comments)
+            comments = ["_"] * len(self.comments)
         else:
-            comments = [""] * (len(self.comments) - 1)
+            comments = ["_"] * (len(self.comments) - 1)
         return FeatureVector(metadata=self,
-                             name="",
+                             name="VECTOR",
                              features=np.zeros(shape=self.num_features,
                                                dtype=self.properties_dtype),
                              point=Point3D(0, 0, 0),
                              comments=comments)
+
+    def create_vector(self, name=None, features=None, point=None, comments=None):
+        # Create a template to ensure correct sizes
+        template = self.create_vector_template()
+        if name is not None:
+            template.name = name
+        if features is not None:
+            template.features = features
+        if point is not None:
+            template.point = point
+        if comments is not None:
+            template.comments = comments
+
+        return template
 
 
 class FeatureVector(object):
@@ -151,16 +165,16 @@ class FeatureVector(object):
     def pdbid(self):
         """ Guessed PDBID """
         # This is an approximate method
-        if 'PDB' in self.comments:
+        if self.has_named_comment('PDB'):
             return self.get_named_comment('PDB')
-        elif 'PDBID_LIST' in self.comments:
-            return self.get_named_comment('PDBID_LIST')
-        elif 'PDBID' in self.comments:
+        elif self.has_named_comment('PDBID'):
             return self.get_named_comment('PDBID')
         elif self.name.startswith('Env_'):
             return self.name.split('_')[1]
+        elif 'PDBID_LIST' in self.metadata:
+            return self.metadata.get('PDBID_LIST')
         else:
-            return None
+            return []
 
     @property
     def pdb_point(self):

@@ -73,8 +73,9 @@ def find_dssp_file(filename, dsspdirList=None):
     # extract pdbid from pdbid
     if dsspdirList is None:
         dsspdirList = _DSSP_DIR
-    if type(dsspdirList) == str:
-        dsspdirList = _DSSP_DIR.split(os.pathsep)
+    if isinstance(dsspdirList, str):
+        dsspdirList = dsspdirList.split(os.pathsep)
+
     pdbid = pdbidFromFilename(filename)
     pdbidl = pdbid.lower()
     branch = pdbidl[1:3]

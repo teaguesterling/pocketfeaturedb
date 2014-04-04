@@ -25,11 +25,11 @@ from pocketfeature.tasks.core import Task
 def find_neighboring_residues(structure, queries, cutoff=6.0, 
                                                   ordered=True,
                                                   excluded=is_het_residue,
-                                                  residue_centers=None):
+                                                  residue_centers=None,
+                                                  skip_partial_residues=True):
 
-    all_atoms = (a for a in structure.get_atoms())
-    non_het = (a for a in all_atoms if not excluded(a.get_parent()))
-    neighbors = NeighborSearch(list(non_het))
+    all_atoms = list(structure.get_atoms())
+    neighbors = NeighborSearch(all_atoms)
     residues = set()
     for query in queries:  # Search through query points
         found = neighbors.search(query, cutoff, 'R')  # Search of Residues
@@ -38,7 +38,9 @@ def find_neighboring_residues(structure, queries, cutoff=6.0,
             residues.add(found)
         else:  # Check if any active sites are within cutuff
             for residue in found:
-                points = [point for code, point in residue_centers(residue)]
+                centers = residue_centers(residue, skip_partial_residues=skip_partial_residues,
+                                                   ignore_unknown_residues=True)
+                points = [point for code, point in centers]
                 meets_cutoff = (norm(query - pt) <= cutoff for pt in points)
                 if any(meets_cutoff):
                     residues.add(residue)

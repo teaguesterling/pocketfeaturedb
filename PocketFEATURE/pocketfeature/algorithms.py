@@ -109,18 +109,24 @@ def munkres_align(scores, shift_negative=False, maximize=False):
 class GaussianStats(object):
     """ A class for calculating simple statistics over streams of data """
 
-    def __init__(self, n=0, mean=None, m2=None):
-         self.reset(n=n, mean=mean, m2=m2)
+    def __init__(self, n=0, mean=None, m2=None, mins=None, maxes=None):
+         self.reset(n=n, mean=mean, m2=m2, mins=mins, maxes=maxes)
 
-    def reset(self, n=0, mean=None, m2=None):
+    def reset(self, n=0, mean=None, m2=None, mins=None, maxes=None):
         if mean is None:
             mean = np.zeros(1)
         if m2 is None:
             m2 = np.zeros(1)
+        if mins is None:
+            mins = np.zeros(1)
+        if maxes is None:
+            maxes = np.zeros(1)
 
         self._n = n
         self._mean = np.array(mean)
         self._m2 = np.array(m2)
+        self._mins = np.array(mins)
+        self._maxes = np.array(maxes)
 
     def record(self, item):
         sample = np.array(item)
@@ -129,10 +135,14 @@ class GaussianStats(object):
         delta = sample - self._mean
         mean = self._mean + delta / n
         m2 = self._m2 + delta * (sample - mean)
+        mins = np.minimum(self._mins, sample)
+        maxes = np.maximum(self._maxes, sample)
 
         self._n = n
         self._mean = mean
         self._m2 = m2
+        self._mins = mins
+        self._maxes = maxes
 
         return item
 
@@ -149,8 +159,11 @@ class GaussianStats(object):
 
         m2 = self.m2 + other.m2 + scaled_delta
 
+        mins = np.minimum(self.mins, other.mins)
+        maxes = np.maximum(self.maxes, other.maxes)
+
         cls = type(self)
-        return cls(n=n, mean=mean, m2=m2)
+        return cls(n=n, mean=mean, m2=m2, mins=min, maxes=maxes)
 
     @property
     def n(self):
@@ -179,6 +192,14 @@ class GaussianStats(object):
     @property
     def pop_std_dev(self):
         return np.sqrt(self.pop_variance)
+
+    @property
+    def mins(self):
+        return self._mins
+
+    @property
+    def maxes(self):
+        return self._maxes
 
 
 class Indexer(defaultdict):

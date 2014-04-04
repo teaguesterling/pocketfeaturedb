@@ -4,8 +4,9 @@ from cStringIO import StringIO
 import numpy as np
 
 COORDS_LINE = "{:.3f}\t{:.3f}\t{:.3f}"
-NON_COMMENT_LINE = "{}\t" + COORDS_LINE
-COMMENT_LINE = NON_COMMENT_LINE + "\t#\t{}"
+POINT_LINE = "{}\t" + COORDS_LINE
+NON_COMMENT_LINE = POINT_LINE + "\n"
+COMMENT_LINE = POINT_LINE + "\t#\t{}" + "\n"
 
 
 
@@ -54,8 +55,7 @@ class PDBPoint(Point3D):
         return "{0}({1}, {2}, {3}, pdbid={4})".format(cls_name, *args)
 
 
-def dump(pointlist, io):
-    """ Write a point list to a file-like object """
+def dumpi(pointlist):
     for point in pointlist:
         if point.comment:
             tpl = COMMENT_LINE
@@ -67,7 +67,14 @@ def dump(pointlist, io):
         else:
             tpl = NON_COMMENT_LINE
             line = (point.pdbid, point.x, point.y, point.z)
-        print(tpl.format(*line), file=io)
+        yield tpl.format(*line)
+
+
+def dump(pointlist, io):
+    """ Write a point list to a file-like object """
+    lines = dumpi(pointlist)
+    for line in lines:
+        io.write(line)
 
 
 def loadi(src, wrapper=PDBPoint, ignore_invalid=False):

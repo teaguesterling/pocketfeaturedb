@@ -8,7 +8,7 @@ from feature.backends.external import default_environ
 
 
 def featurize_points_raw(pointlist, **kwargs):
-    points = pointfile.dumps(pointlist)
+    points = pointfile.dumpi(pointlist)
     result = backends.featurize_points(points, _iter=True, **kwargs)
     return result
 

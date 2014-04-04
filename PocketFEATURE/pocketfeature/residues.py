@@ -79,6 +79,7 @@ class CenterCalculator(dict):
                        get_codes=get_center_codes,
                        get_name=atom_name,
                        get_point=average_coords,
+                       ignore_unknown_residues=True,
                        strict=True):
         self.centers = centers
         self.classes = classes
@@ -88,6 +89,7 @@ class CenterCalculator(dict):
         self.get_name = get_name
         self.get_point = get_point
         self.strict = strict
+        self.ignore_unknown = ignore_unknown_residues
 
     def __getitem__(self, key):
         key = self.normalize_key(key)
@@ -105,7 +107,8 @@ class CenterCalculator(dict):
         num_centers = len(centers)
         codes = self.get_codes(key, range(num_centers))
         # Create reusable function to calculate center point(s)
-        def fn(atoms):
+        def fn(atoms, skip_partial_residues=True):
+            strict = self.strict and not skip_partial_residues
             points = []
             for code, center_atoms in zip(codes, centers):
                 found_atoms = [atom for atom in atoms 
@@ -113,8 +116,15 @@ class CenterCalculator(dict):
                 if len(found_atoms) == len(center_atoms):
                     point = self.get_point(found_atoms)
                     points.append((code, point))
-                elif self.strict:
-                    raise ValueError("Missing atoms in {0}: {1}".format(code, atoms))
+                elif strict:
+                    print(strict, self.strict, fail_on_partial_residues)
+                    try:
+                        res = "/".join(map(str, atoms.get_full_id()))
+                    except AttributeError:
+                        res = atoms
+                    atoms = list(atoms)
+                    expected = center_atoms
+                    raise ValueError("Missing atoms in {0} ({1}): {2} /= {3}".format(code, res, atoms, expected))
             return points
         return fn
 
@@ -123,11 +133,21 @@ class CenterCalculator(dict):
             key = self.normalize_key(key)
             self[key] = self._build_function(key)
 
-    def get_center(self, residue):
+    def _default_fn(self):
+        return []
+
+    def get_center(self, residue, ignore_unknown_residues=True, **kwargs):
+        ignore_unknown = self.ignore_unknown or ignore_unknown_residues
         key = self.normalize_key(self.get_key(residue))
-        fn = self[key]
-        centers = fn(residue)
-        return centers
+        try:
+            fn = self[key]
+            centers = fn(residue, **kwargs)
+            return centers
+        except KeyError:
+            if ignore_unknown:
+                return []
+            else:
+                raise ValueError("No residue centers defined for {0} and ignore disabled".format(key))
 
     def get_code_for(self, residue):
         key = self.normalize_key(self.get_key(residue))
@@ -142,8 +162,8 @@ class CenterCalculator(dict):
         return [code for key, idx in residues_idx
                      for code in self.get_code(key, idx)]
 
-    def __call__(self, arg):
-        return self.get_center(arg)
+    def __call__(self, arg, **kwargs):
+        return self.get_center(arg, **kwargs)
 
 
 DEFAULT_CENTERS = CenterCalculator(CENTERS, CLASSES)

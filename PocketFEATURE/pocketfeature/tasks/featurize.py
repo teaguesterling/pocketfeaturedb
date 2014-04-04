@@ -10,9 +10,9 @@ from pocketfeature.io import featurefile
 from pocketfeature.tasks.core import Task
 
 
-def featurize_points(pointslist, featurize_args={}, **kwargs):
+def featurize_points(pointslist, featurize_args={}, featurefile_args={}):
     data = featurize_points_raw(pointslist, **featurize_args)
-    ff = featurefile.load(data, **kwargs)
+    ff = featurefile.load(data, **featurefile_args)
     return ff
 
 

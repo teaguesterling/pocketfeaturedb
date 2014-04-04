@@ -129,7 +129,7 @@ class PassThroughItems(object):
         return self.entries
 
 
-def load(io, dims=2, delimiter=None, columns=None, cast=None, make_key=tuple):
+def load(io, dims=2, delimiter=None, columns=None, cast=None, make_key=tuple, value_dims=None):
     positions = []
     indexes = [Indexer() for i in range(dims)]
     columns = list(columns) if columns is not None else None
@@ -144,7 +144,12 @@ def load(io, dims=2, delimiter=None, columns=None, cast=None, make_key=tuple):
             index.add(keys[i])
         positions.append((keys, values))
 
-    return MatrixValues(positions, indexes, value_dims=value_count)
+    if value_dims is not None:
+        value_dims = value_dims  # TODO: Clip and test
+    else:
+        value_dims = value_count
+
+    return MatrixValues(positions, indexes, value_dims=value_dims)
 
 
 def dump(matrix_values, io, delimiter="\t", columns=None, tpl="{:.3f}"):
