@@ -77,6 +77,28 @@ def pocket_from_pdb(pdb_path, find_ligand=pick_best_ligand,
     return pocket
 
 
+def get_pdb_list(pdb_src, pdb_dir=None, log=logging, fail_on_missing=True):
+    if not os.path.exists(pdb_src):
+        raise RuntimeError("{0} not found".format(pdb_src))
+    elif os.path.isdir(pdb_src):
+        log.info("Looking for PDBs in directory: {0}".format(pdb_src))
+        pdb_names = os.listdir(pdb_src)
+        pdb_locs = [os.path.join(pdb_src, pdb_name) for pdb_name in pdb_names]
+    else:
+        log.info("Reading PDB IDs from file: {0}".format(pdb_src))
+        with open(pdb_src) as f:
+            pdb_locs = list(f)
+
+    found = []    
+    for pdbid in pdb_locs:
+        try:
+            found.append(find_pdb_file(pdbid, pdbdirList=pdb_dir))
+        except ValueError:
+            log.warning("Could not find PDB: {0}".format(pdbid))
+  
+    return found
+
+
 def featurize_point_stream(points, featurize_args={}, load_args={}):
     results = featurize_points_raw(points, **featurize_args)
     ff = featurefile_pf.iload(results)
@@ -201,7 +223,7 @@ class GeneratePocketFeatureBackground(Task):
             with open(params.background) as f:
                 bg = backgrounds.load_stats_data(f)
         else:
-            pdbs = self.get_pdb_files()
+            pdbs = get_pdb_list(params.pdbs, pdb_dir=self.pdb_dir, log=self.log)
             self._num_pdbs = len(pdbs)
             log.info("Found {0} PDBs".format(self._num_pdbs))
             vectors = self.get_pocket_vectors(pdbs)
@@ -434,22 +456,6 @@ class GeneratePocketFeatureBackground(Task):
             if key in allowed_pairs and key not in finished:
                 allowed_map[key] = (pathA, pathB)  # order isn't important
         return allowed_map, finished
-
-    def get_pdb_files(self):
-        pdb_src = self.params.pdbs
-        if not os.path.exists(pdb_src):
-            raise RuntimeError("{0} not found".format(pdb_src))
-        elif os.path.isdir(pdb_src):
-            self.log.info("Looking for PDBs in directory: {0}".format(pdb_src))
-            pdb_names = os.listdir(pdb_src)
-            pdb_paths = [os.path.join(pdb_src, pdb_name) for pdb_name in pdb_names]
-            pdb_files = [find_pdb_file(pdb, pdbdirList=self.params.pdb_dir) for pdb in pdb_paths]
-        else:
-            self.log.info("Reading PDB IDs from file: {0}".format(pdb_src))
-            with open(pdb_src) as f:
-                pdbids = list(f)
-            pdb_files = [find_pdb_file(pdbid, pdbdirList=self.params.pdb_dir) for pdbid in pdbids]
-        return pdb_files
 
     def get_ff_file(self, vector):
         res_type = get_vector_type(vector)

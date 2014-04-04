@@ -24,6 +24,14 @@ class Task(object):
         return task
 
     @classmethod
+    def from_params(cls, **kwargs):
+        namespace = object()
+        for key, value in kwargs.items():
+            setattr(namespace, key, value)
+        task = cls.from_namespace(namespace)
+        return task
+
+    @classmethod
     def arguments(cls, stdin, stdout, stderr, environ, task_name):
         from argparse import ArgumentParser
         parser = ArgumentParser(task_name)
