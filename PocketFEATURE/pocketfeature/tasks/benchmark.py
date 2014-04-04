@@ -62,15 +62,17 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, pdb_dir, params):
         'output': buf,
     }
     task = ComparePockets.from_params(
-        ligandA=None,  # Defaults
-        ligandB=None, 
+        ligandA=params['ligandA'],  # Extract positive ligands if specified
+        ligandB=params['ligandB'], 
         cutoff=top_cutoff,
         allowed_pairs=params['allowed_pairs'],
         distance=params['distance'],
-        log_level='warning',
+        log_level='error',
         **job_files
     )
-    task.run()
+    if task.run() != 0:
+        return key, None
+
     buf.seek(0)
     results = matrixvaluesfile.load(buf, cast=float)
     scores = results.values()
@@ -94,11 +96,11 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, pdb_dir, params):
         task.run()
         for f in job_files.values():
             f.close()
+
         with open(align_path) as f:
             score = sum(matrixvaluesfile.load(f, cast=float).values())
             scores.append(score)
 
-        
     return key, scores
         
 
@@ -137,7 +139,7 @@ class BenchmarkPocketFeatureBackground(Task):
                 log.warn("Resuming with feature vectors from BENCH_DIR")
             else:
                 log.warning("BENCH_DIR is not empty and NOT resuming. Erasing benchmark files")
-                #shutil.rmtree(params.bench_dir)
+                shutil.rmtree(params.bench_dir)
         else:
             if params.resume:
                 log.error("Cannot resume without populated BENCH_DIR")
@@ -146,24 +148,24 @@ class BenchmarkPocketFeatureBackground(Task):
                 log.debug("Creating directory {0}".format(params.bench_dir))
                 os.makedirs(params.bench_dir)
                 
-        #self.positive_stats = self.compare_positives()
+        self.positive_stats = self.compare_positives()
         self.control_stats = self.compare_controls()
 
-        #ps = self.positive_stats
+        ps = self.positive_stats
         cs = self.control_stats
 
         with open(self.params.summary_out, 'w') as f:
             print('class', 'cutoff', 'mean', 'std', 'min', 'max', file=f, sep='\t')
             print('class', 'cutoff', 'mean', 'std', 'min', 'max', sep='\t')
             for c, cutoff in enumerate(self.cutoffs):
-         #       print('Positive', cutoff, ps.mean[c], ps.std_dev[c], ps.mins[c], ps.maxes[c], sep='\t', file=f)
+                print('Positive', cutoff, ps.mean[c], ps.std_dev[c], ps.mins[c], ps.maxes[c], sep='\t', file=f)
                 print('Control', cutoff, cs.mean[c], cs.std_dev[c], cs.mins[c], cs.maxes[c], sep='\t', file=f)
-         #       print('Positive', cutoff, ps.mean[c], ps.std_dev[c], ps.mins[c], ps.maxes[c], sep='\t')
+                print('Positive', cutoff, ps.mean[c], ps.std_dev[c], ps.mins[c], ps.maxes[c], sep='\t')
                 print('Control', cutoff, cs.mean[c], cs.std_dev[c], cs.mins[c], cs.maxes[c], sep='\t')
             
 
 
-    def compare_pdb_pairs(self, pairs, comp_name, output):
+    def compare_pdb_pairs(self, pairs, comp_name, output, ligA=None, ligB=None):
         pairs = list(pairs)
         num_comps = len(pairs)
         comp_dir = os.path.join(self.params.bench_dir, comp_name)
@@ -177,6 +179,8 @@ class BenchmarkPocketFeatureBackground(Task):
             'normalization': self.params.normalization,
             'distance': self.params.distance,
             'allowed_pairs': self.params.allowed_pairs,
+            'ligandA': ligA,
+            'ligandB': ligB,
         }
         
         all_args = ((comp_dir, pdbA, pdbB, self.cutoffs, self.params.pdb_dir, pf_params)
@@ -208,7 +212,9 @@ class BenchmarkPocketFeatureBackground(Task):
                                                         log=self.log)
         pairs = itertools.combinations(positives, 2)
         output = self.params.positives_out
-        scores, stats = self.compare_pdb_pairs(pairs, 'positives', output)
+        scores, stats = self.compare_pdb_pairs(pairs, 'positives', output,
+                                               ligA=self.params.positive_ligands,
+                                               ligB=self.params.positive_ligands)
 
         return stats
     
@@ -219,7 +225,8 @@ class BenchmarkPocketFeatureBackground(Task):
                                                       log=self.log)
         pairs = itertools.product(positives, controls)
         output = self.params.controls_out
-        scores, stats = self.compare_pdb_pairs(pairs, 'controls', output)
+        scores, stats = self.compare_pdb_pairs(pairs, 'controls', output,
+                                               ligA=self.params.positive_ligands)
 
         return stats
         
@@ -227,9 +234,13 @@ class BenchmarkPocketFeatureBackground(Task):
     def record_scores(self, scores, output):
         with open(output, 'w') as f:
             for item in scores:
-                passthough = PassThroughItems([item])
-                matrixvaluesfile.dump(passthough, f)
-                yield item
+                key, values = item
+                if values is None:
+                    self.log.error("Failure to compare {0}".format(":".join(key)))
+                else:
+                    passthough = PassThroughItems([item])
+                    matrixvaluesfile.dump(passthough, f)
+                    yield item
             
 
     @classmethod
@@ -251,7 +262,7 @@ class BenchmarkPocketFeatureBackground(Task):
             dssp_dir = '.'
 
         parser = ArgumentParser(
-            """Generate background files for PocketFEATURE calculations""")
+            """Benchmark a PocketFEATURE background""")
         parser.add_argument('positives', metavar='POSITIVE',
                                           help='Path to a file containing PDB ids to treat as positives')
         parser.add_argument('controls', metavar='CONTROL',
@@ -272,6 +283,9 @@ class BenchmarkPocketFeatureBackground(Task):
                                       choices=backgrounds.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
                                       default='classes',
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
+        parser.add_argument('-L', '--positive-ligands', metavar='LIGANDS',
+                                                        default=None,
+                                                        help='Comma-separated list of ligands to extract from positives')
         parser.add_argument('-d', '--distance', metavar='CUTOFF',
                                               type=float,
                                               default=cls.LIGAND_RESIDUE_DISTANCE,
