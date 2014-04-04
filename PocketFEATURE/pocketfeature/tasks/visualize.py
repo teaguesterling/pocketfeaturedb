@@ -71,6 +71,7 @@ def create_alignment_visualizations(pointsA, pointsB, alignment, pdbA=None,
         if radii is None:
             scores = alignment.values()
             minScore, maxScore = min(scores), max(scores)
+            maxScore = max(maxScore, 1)  # prevent divide by zero
             radii = [score/(maxScore) for score in scores]
         else:
             radii = list(radii)
