@@ -61,6 +61,7 @@ class Pocket(object):
             ligname = '?'
         if self.name is not None:
             ligname = self.name
+        ligname = ligname.replace(' ', '-')
 
         return (self.pdbid, ligchain, lignum, ligname)
 
