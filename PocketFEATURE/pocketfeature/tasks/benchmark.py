@@ -97,6 +97,7 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, pdb_dir, params):
         with open(align_path) as f:
             score = sum(matrixvaluesfile.load(f, cast=float).values())
             scores.append(score)
+
         
     return key, scores
         
@@ -136,7 +137,7 @@ class BenchmarkPocketFeatureBackground(Task):
                 log.warn("Resuming with feature vectors from BENCH_DIR")
             else:
                 log.warning("BENCH_DIR is not empty and NOT resuming. Erasing benchmark files")
-                shutil.rmtree(params.bench_dir)
+                #shutil.rmtree(params.bench_dir)
         else:
             if params.resume:
                 log.error("Cannot resume without populated BENCH_DIR")
@@ -145,19 +146,19 @@ class BenchmarkPocketFeatureBackground(Task):
                 log.debug("Creating directory {0}".format(params.bench_dir))
                 os.makedirs(params.bench_dir)
                 
-        self.positive_stats = self.compare_positives()
+        #self.positive_stats = self.compare_positives()
         self.control_stats = self.compare_controls()
 
-        ps = self.positive_stats
+        #ps = self.positive_stats
         cs = self.control_stats
 
         with open(self.params.summary_out, 'w') as f:
             print('class', 'cutoff', 'mean', 'std', 'min', 'max', file=f, sep='\t')
             print('class', 'cutoff', 'mean', 'std', 'min', 'max', sep='\t')
             for c, cutoff in enumerate(self.cutoffs):
-                print('Positive', cutoff, ps.mean[c], ps.std_dev[c], ps.mins[c], ps.maxes[c], sep='\t', file=f)
+         #       print('Positive', cutoff, ps.mean[c], ps.std_dev[c], ps.mins[c], ps.maxes[c], sep='\t', file=f)
                 print('Control', cutoff, cs.mean[c], cs.std_dev[c], cs.mins[c], cs.maxes[c], sep='\t', file=f)
-                print('Positive', cutoff, ps.mean[c], ps.std_dev[c], ps.mins[c], ps.maxes[c], sep='\t')
+         #       print('Positive', cutoff, ps.mean[c], ps.std_dev[c], ps.mins[c], ps.maxes[c], sep='\t')
                 print('Control', cutoff, cs.mean[c], cs.std_dev[c], cs.mins[c], cs.maxes[c], sep='\t')
             
 
