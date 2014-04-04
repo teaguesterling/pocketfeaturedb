@@ -414,7 +414,7 @@ def _dump_vectors_using_metadata(metadata, vectors, io):
         coords_at = 0
     for vector in vectors:
         print(vector.name, end='\t', file=io)
-        print(*vector.features, sep='\t', end='\t', file=io)
+        print(*map("{:.3f}".format, vector.features), sep='\t', end='\t', file=io)
         comments = list(vector.comments)
         if vector.coords is not None:
             coords_str = "\t".join(['#'] + map("{:.3f}".format, vector.coords))
