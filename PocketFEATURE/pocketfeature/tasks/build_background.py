@@ -25,6 +25,7 @@ from feature.io.locate_files import (
 from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity,
     GaussianStats,
+    unique_product,
 )
 from pocketfeature.io import (
     backgrounds,
@@ -90,7 +91,12 @@ def calculate_residue_pair_normalization(key, std_dev, fileA, fileB):
          gzip.open(fileB) as ioB:
         ffA = featurefile.load(ioA)
         ffB = featurefile.load(ioB)
-        pairs = itertools.product(ffA.vectors, ffB.vectors)
+        if fileA == fileB:
+            # TODO: Should we really be special-casing A==B to ensure we don't
+            #       compare each pair twice or compare the identity
+            pairs = unique_product(ffA.vectors, ffB.vectors, skip=1)
+        else:
+            pairs = itertools.product(ffA.vectors, ffB.vectors)
         for vectorA, vectorB in pairs:
             a = vectorA.features
             b = vectorB.features
@@ -99,8 +105,11 @@ def calculate_residue_pair_normalization(key, std_dev, fileA, fileB):
 
     mode = mean = float(stats.mean)  # Mean == Mode for Gaussian
     std = float(stats.std_dev)
+    n = int(stats.n)
+    low = float(stats.mins)
+    high = float(stats.maxes)
     
-    return key, (mode, std)
+    return key, (mode, std, n, low, high)
 
 
 def _calculate_residue_pair_normalization_star(args):
@@ -252,7 +261,7 @@ class GeneratePocketFeatureBackground(Task):
         if params.progress:
             items = display_progress(items)
 
-        values_out = PassThroughItems(items, value_dims=('mode', 'std_dev'))
+        values_out = PassThroughItems(items)
         log.debug("Writing Background normalization coefficients to {0}".format(params.normalization))
   
         with open(params.normalization, write_mode) as f:
@@ -390,11 +399,13 @@ class GeneratePocketFeatureBackground(Task):
             dssp = find_dssp_file(pdbid, dsspdirList=self.params.dssp_dir)
         except ValueError:
             dssp = os.path.join(self.params.dssp_dir, pdbid + ".dssp")
-            self.log.info("Creating DSSP file: {0}".format(dssp))
+            if self.params.show_dssp_action:
+                self.log.info("Creating DSSP file: {0}".format(dssp))
             try:
                 dssp = generate_dssp_file(pdb, dssp)
             except Exception as err:
-                self.log.error("Failed to generate DSSP for {0}".format(pdbid))
+                if self.params.show_dssp_action:
+                    self.log.error("Failed to generate DSSP for {0}".format(pdbid))
                 return None
         if not os.path.exists(dssp):
             raise ValueError("Missing DSSP File: {0}".format(dssp))
@@ -510,9 +521,6 @@ class GeneratePocketFeatureBackground(Task):
                                             type=int,
                                             default=None,
                                             help='Limit the number of points to include')
-        parser.add_argument('--validation', metavar=('POS_PDBIDS', 'NEG_PDBIDS'), nargs=2,
-                                           default=None,
-                                           help='Lists PDBs containing positive/negative hits [default: None]')
         parser.add_argument('-P', '--num-processors', metavar='PROCS',
                                                       default=1,
                                                       type=int,
@@ -526,6 +534,9 @@ class GeneratePocketFeatureBackground(Task):
         parser.add_argument('--progress', action='store_true',
                                           default=False,
                                           help='Show interactive progress [default: %(default)s]')
+        parser.add_argument('--show-dssp-action', action='store_true',
+                                                  default=False,
+                                                  help='Show DSSP generation [default: %(default)s]')
         parser.add_argument('--log', metavar='LOG',
                                      type=FileType,
                                      default=stderr,
