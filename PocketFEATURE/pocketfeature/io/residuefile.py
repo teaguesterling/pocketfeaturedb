@@ -17,8 +17,12 @@ def write_residue_id(residue):
 
 
 def read_residue_id(res_id):
-    pdb, model, chain, res, name = res_id.split(DELIMITER)
-    return (pdb, int(model), chain, int(res), name)
+    tokens = res_id.split(DELIMITER)
+    if len(tokens) == 1:
+        return tokens[0]
+    else:
+        pdb, model, chain, res, name = tokens
+        return (pdb, int(model), chain, int(res), name)
 
 
 def dump(residue_list, io):
