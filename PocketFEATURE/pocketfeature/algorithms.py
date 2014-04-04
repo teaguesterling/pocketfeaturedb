@@ -169,7 +169,7 @@ class GaussianStats(object):
         maxes = np.maximum(self.maxes, other.maxes)
 
         cls = type(self)
-        return cls(n=n, mean=mean, m2=m2, mins=min, maxes=maxes)
+        return cls(n=n, mean=mean, m2=m2, mins=mins, maxes=maxes)
 
     @property
     def n(self):
