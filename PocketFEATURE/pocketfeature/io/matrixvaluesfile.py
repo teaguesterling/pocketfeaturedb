@@ -37,10 +37,13 @@ class MatrixValues(OrderedDict):
         super(MatrixValues, self).__init__(entries)
         # Try to guess correct "shape" from first provided key
         if value_dims is None:
-            some_key = self.keys()[0]
-            if isinstance(self[some_key], (list, tuple)):
-                value_dims = len(self[some_key])
-            else:
+            try:
+                some_key = self.keys()[0]
+                if isinstance(self[some_key], (list, tuple)):
+                    value_dims = len(self[some_key])
+                else:
+                    value_dims = 1
+            except IndexError:
                 value_dims = 1
             dim_refs = {}
         elif isinstance(value_dims, (list, tuple)):
