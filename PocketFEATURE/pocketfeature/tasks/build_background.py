@@ -87,7 +87,7 @@ def get_pdb_list(pdb_src, pdb_dir=None, log=logging, fail_on_missing=True):
     else:
         log.info("Reading PDB IDs from file: {0}".format(pdb_src))
         with open(pdb_src) as f:
-            pdb_locs = list(f)
+            pdb_locs = map(str.strip, f)
 
     found = []    
     for pdbid in pdb_locs:
