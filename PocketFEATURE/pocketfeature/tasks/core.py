@@ -25,9 +25,8 @@ class Task(object):
 
     @classmethod
     def from_params(cls, **kwargs):
-        namespace = object()
-        for key, value in kwargs.items():
-            setattr(namespace, key, value)
+        klass = type('namespace', (object,), kwargs)
+        namespace = klass()
         task = cls.from_namespace(namespace)
         return task
 
