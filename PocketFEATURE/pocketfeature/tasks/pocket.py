@@ -16,6 +16,7 @@ from pocketfeature.utils.pdb import (
     find_residues_by_id,
     guess_pdbid_from_stream,
     is_het_residue,
+    is_ligand_residue,
     list_ligands,
 )
 
@@ -24,7 +25,7 @@ from pocketfeature.tasks.core import Task
 
 def find_neighboring_residues(structure, queries, cutoff=6.0, 
                                                   ordered=True,
-                                                  excluded=is_het_residue,
+                                                  excluded=is_ligand_residue,
                                                   residue_centers=None,
                                                   skip_partial_residues=True):
 
