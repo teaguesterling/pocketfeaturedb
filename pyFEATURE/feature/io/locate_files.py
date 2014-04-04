@@ -31,10 +31,13 @@ def find_pdb_file(filename, pdbdirList=None):
         pdbdirList = pdbdirList.split(os.pathsep)
     pdbid = pdbidFromFilename(filename)
     pdbidl = pdbid.lower()
+    pdbidu = pdbid.upper()
     branch = pdbidl[1:3]
 
     # generate filename variants
-    basenames = [x%vars() for x in ( "%(filename)s", "%(pdbid)s", "%(pdbidl)s", "pdb%(pdbidl)s" )]
+    basenames = [x%vars() for x in ( "%(filename)s", "%(pdbid)s", 
+                                     "%(pdbidl)s", "pdb%(pdbidl)s",
+                                     "%(pdbidu)s", "pdb%(pdbidu)s"  )]
     basenames = list(set(basenames))
     extensions = ( "", ".pdb", ".ent", ".FULL" )
     compressions = ( "", ".gz", ".Z" )
@@ -61,6 +64,8 @@ def find_pdb_file(filename, pdbdirList=None):
                     filename = os.path.join(subdir,"%(base)s%(ext)s%(cmp)s" % vars())
                     if os.path.exists(filename):
                         return filename
+                    elif os.path.exists(filename.upper()):
+                        return filename.upper()
 
     raise ValueError("Could not find PDB file: {}".format(filename))
 
