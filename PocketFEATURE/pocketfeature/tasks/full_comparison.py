@@ -45,7 +45,6 @@ class ComparePockets(Task):
         log = logging.getLogger('pocketfeature')
         log.setLevel(LOG_LEVELS.get(params.log_level, 'debug'))
 
-
         log.info("Loading background")
         log.debug("Allowed residue pairs: {0}".format(params.allowed_pairs)) 
         background = backgrounds.load(stats_file=params.background,
@@ -98,7 +97,8 @@ class ComparePockets(Task):
         log.info("FEATURIZING Pockets")
         log.debug("FEATURIZING Pocket A")
         featurefileA = featurize_points(pocketA.points, 
-                                        rename_from_comment='DESCRIPTION')
+                                        featurefile_args={
+                                            'rename_from_comment': 'DESCRIPTION'})
         _numA = len(featurefileA.vectors)
         if params.ffA is not None:
             log.debug("Wring FEATURE file A")
@@ -106,7 +106,8 @@ class ComparePockets(Task):
             params.ffA.close()
         log.debug("FEATURIZING Pocket B")
         featurefileB = featurize_points(pocketB.points,
-                                        rename_from_comment='DESCRIPTION')
+                                        featurefile_args={
+                                            'rename_from_comment': 'DESCRIPTION'})
         _numB = len(featurefileB.vectors)
         if params.ffB is not None:
             log.debug("Wring FEATURE file B")
