@@ -11,8 +11,10 @@
 """
 
 from cStringIO import StringIO
+import gzip
 import os
 import sys
+import tempfile
 
 import sh
 
@@ -119,9 +121,7 @@ raw_dssp = locate_subprocess_binary(DSSP_NAME, DSSP_BIN, raise_error=False)
 raw_featurize = locate_subprocess_binary('featurize', FEATURIZE_BIN)
 
 
-def generate_dssp_file(pdb_file, dssp_file=None,
-                        working_dir=SCRATCH_DIR,
-                        environ=None):
+def generate_dssp_file(pdb_file, dssp_file=None, environ=None, **exec_params):
     """
         pdb_file -> dssp_file (in working_dir if dssp_file is not provided)
 
@@ -144,14 +144,20 @@ def generate_dssp_file(pdb_file, dssp_file=None,
         pdb_name, _ = os.path.splitext(os.path.basename(pdb_file))
         dssp_file = "{0}.dssp".format(pdb_name)
 
-    exec_params = {
+    exec_params.update({
         '_env': environ,        # Run in the feature environment
-        '_cwd': working_dir,    # Run in the supplied working directory
-    }
+    })
 
-    raw_dssp(i=pdb_file, o=dssp_file, **exec_params)
+    if pdb_file.endswith('.gz'):
+        with gzip.open(pdb_file) as f,\
+             tempfile.NamedTemporaryFile() as t:
+            for l in f:
+                t.write(l)
+            raw_dssp(i=t.name, o=dssp_file, **exec_params)
+    else:
+        raw_dssp(i=pdb_file, o=dssp_file, **exec_params)
 
-    return os.path.join(working_dir, dssp_file)
+    return dssp_file
 
 
 def featurize(shells=None,

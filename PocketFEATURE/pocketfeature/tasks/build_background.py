@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env pythoe
 from __future__ import print_function
 
 import contextlib
@@ -8,6 +8,7 @@ import logging
 import multiprocessing
 import os
 import sys
+import random
 
 from feature.backends.external import generate_dssp_file 
 from feature.backends.wrappers import featurize_points_raw
@@ -76,6 +77,10 @@ def featurize_point_stream(points, featurize_args={}, load_args={}):
     results = featurize_points_raw(points, **featurize_args)
     ff = featurefile_pf.iload(results)
     return ff
+
+
+def _featurize_point_stream_star(args):
+    return featurize_point_stream(*args)
 
 
 def calculate_residue_pair_normalization(key, std_dev, fileA, fileB):
@@ -160,9 +165,11 @@ class GeneratePocketFeatureBackground(Task):
             if params.resume:
                 log.warn("Resuming with feature vectors from FF_DIR")
             else:
-                log.warn("FF_DIR is not empty and NOT resuming. Erasing temp files")
+                log.warning("FF_DIR is not empty and NOT resuming. Erasing temp files")
                 for ff in os.listdir(params.ff_dir):
-                    print('os.unlink(os.path.join(params.ff_dir, ff))')
+                    ff_path = os.path.join(params.ff_dir, ff)
+                    log.debug("Deleted {0}".format(ff_path))
+                    os.unlink(ff_path)
         else:
             if params.resume:
                 log.error("Cannot resume without populated FF_DIR")
@@ -174,9 +181,6 @@ class GeneratePocketFeatureBackground(Task):
         self.bg = self.generate_vector_stats()
         self.norms = self.generate_score_stats()
 
-        if params.validation:
-            print("Validating")
-
                 
     def generate_vector_stats(self):
         params = self.params
@@ -186,7 +190,7 @@ class GeneratePocketFeatureBackground(Task):
                 bg = backgrounds.load_stats_data(f)
         else:
             pdbs = self.get_pdb_files()
-            self._num_pbs = len(pdbs)
+            self._num_pdbs = len(pdbs)
             log.info("Found {0} PDBs".format(self._num_pdbs))
             vectors = self.get_pocket_vectors(pdbs)
             stats, metadata, pdbs = self.process_vectors(vectors)
@@ -235,7 +239,7 @@ class GeneratePocketFeatureBackground(Task):
 
         log.info("Computing background normalizations for {0} residue pairs".format(num_pairs))
         num_processors = min(params.num_processors, num_pairs)
-        if params.num_processors is None or num_processors > 1:
+        if params.num_processors is not None and num_processors > 1:
             log.info("Calculating with {0} workers".format(params.num_processors))
             pool = multiprocessing.Pool(num_processors)
             items = pool.imap(_calculate_residue_pair_normalization_star, all_args)
@@ -282,11 +286,47 @@ class GeneratePocketFeatureBackground(Task):
                 yield point
 
     def get_pocket_vectors(self, pdbs):
+        if self.params.max_points is not None:
+            self.log.info("Shuffling PDBs since max_points specified")
+            random.shuffle(pdbs)
         pockets = self.get_pockets(pdbs)
         points = self.get_points(pockets)
         for vector in self.featurize_points(points):
             self._num_vectors += 1
             yield vector
+
+    # This is a member function as it uses lots of task parameters
+    def featurize_points(self, points):
+        points = self.preprocess_points(points)
+        points = self.record_points(points)
+        
+        if self.params.max_points is not None:
+            self.log.info("Limiting number of points to {0}".format(self.params.max_points))
+            points = itertools.islice(points, self.params.max_points)
+
+        featurize_args = {
+            'environ': {
+                'PDB_DIR': self.params.pdb_dir,
+                'DSSP_DIR': self.params.dssp_dir,
+                'FEATURE_DIR': self.params.feature_dir,
+            },
+        }
+
+        self.log.info("Computing FEATURE vectors")
+        if self.params.num_processors is not None and self.params.num_processors > 1 and False:
+            pass
+#            self.log.info("Calculating with {0} workers".format(self.params.num_processors))
+#            args = ((point, featurize_args) for point in points)
+#            pool = multiprocessing.Pool(self.params.num_processors)
+#            vectors = pool.imap(_featurize_point_stream_star, args)
+        else:
+            if self.params.num_processors is not None and self.params.num_processors > 1:
+                self.log.warning("Parallel FEATURE vector calculation not yet implemented")
+            self.log.debug("Calculating serially")
+            vectors = featurize_point_stream(points, featurize_args=featurize_args)
+
+        return vectors
+
             
     def process_vectors(self, vectors):
         stats = GaussianStats()
@@ -309,42 +349,58 @@ class GeneratePocketFeatureBackground(Task):
                 
         return stats, metadata, pdbs
 
-    # This is a member function as it uses lots of task parameters
-    def featurize_points(self, points):
+    def preprocess_points(self, points):
         ok_pdbs = set()
-        def preprocess(point):
+        bad_pdbs = set()
+        for point in points:
             pdbid = point.pdbid
+            if pdbid in bad_pdbs:
+                continue
             if pdbid not in ok_pdbs:
-                # Sanity checks
-                pdb = find_pdb_file(pdbid, pdbdirList=self.params.pdb_dir)
                 try:
-                    dssp = find_dssp_file(pdbid, dsspdirList=self.params.dssp_dir)
-                except ValueError:
-                    dssp = os.path.join(pdbid + ".dssp")
-                    self.log.warning("Creating DSSP file: {0}".format(dssp))
-                    dssp = generate_dssp_file(pdb, dssp)
-                if not os.path.exists(pdb):
-                    raise ValueError("Missing PDB File: {0}".format(pdb))
-                ok_pdbs.add(pdbid)
-            return point
-        
-        featurize_args = {
-            'environ': {
-                'PDB_DIR': self.params.pdb_dir,
-                'DSSP_DIR': self.params.dssp_dir,
-                'FEATURE_DIR': self.params.feature_dir,
-            },
-        }
-        points = (preprocess(point) for point in points)
+                    point = self.check_protein_files(point)
+                    if point is not None:
+                        ok_pdbs.add(pdbid)
+                    else:
+                        self.log.warning("Skipping {0}".format(pdbid))
+                        bad_pdbs.add(pdbid)
+                        continue
+                except ValueError as err:
+                    self.log.warning("Skipping {0} ({1})".format(pdbid, err))
+                    bad_pdbs.add(pdbid)
+                    continue
+            yield point
 
+    def record_points(self, points):
         if self.params.all_data:
             point_file = os.path.join(self.params.ff_dir, 'points.ptf')
             self.log.debug("Dumping source points to {0}".format(point_file))
-            points_out, points = itertools.tee(points)
             with open(point_file, 'w') as f:
-                pointfile.dump(points_out, f)
-        features = featurize_point_stream(points, featurize_args=featurize_args)
-        return features
+                for point in points:
+                    pointfile.dump([point], f)
+                    yield point
+        else:
+            for point in points:
+                yield point
+    
+    def check_protein_files(self, point):
+        pdbid = point.pdbid
+        pdb = find_pdb_file(pdbid, pdbdirList=self.params.pdb_dir)
+        try:
+            dssp = find_dssp_file(pdbid, dsspdirList=self.params.dssp_dir)
+        except ValueError:
+            dssp = os.path.join(self.params.dssp_dir, pdbid + ".dssp")
+            self.log.info("Creating DSSP file: {0}".format(dssp))
+            try:
+                dssp = generate_dssp_file(pdb, dssp)
+            except Exception as err:
+                self.log.error("Failed to generate DSSP for {0}".format(pdbid))
+                return None
+        if not os.path.exists(dssp):
+            raise ValueError("Missing DSSP File: {0}".format(dssp))
+        if not os.path.exists(pdb):
+            raise ValueError("Missing PDB File: {0}".format(pdb))
+        return point
 
     def get_allowed_ff_pairs(self):
         allowed_pairs = backgrounds.ALLOWED_VECTOR_TYPE_PAIRS[self.params.allowed_pairs]
@@ -371,7 +427,8 @@ class GeneratePocketFeatureBackground(Task):
         elif os.path.isdir(pdb_src):
             self.log.info("Looking for PDBs in directory: {0}".format(pdb_src))
             pdb_names = os.listdir(pdb_src)
-            pdb_files = [os.path.join(pdb_src, pdb_name) for pdb_name in pdb_names]
+            pdb_paths = [os.path.join(pdb_src, pdb_name) for pdb_name in pdb_names]
+            pdb_files = [find_pdb_file(pdb, pdbdirList=self.params.pdb_dir) for pdb in pdb_paths]
         else:
             self.log.info("Reading PDB IDs from file: {0}".format(pdb_src))
             with open(pdb_src) as f:
@@ -449,6 +506,10 @@ class GeneratePocketFeatureBackground(Task):
                                               type=float,
                                               default=cls.LIGAND_RESIDUE_DISTANCE,
                                               help='Residue active site distance threshold [default: %(default)s]')
+        parser.add_argument('--max-points', metavar='MAX_POINTS',
+                                            type=int,
+                                            default=None,
+                                            help='Limit the number of points to include')
         parser.add_argument('--validation', metavar=('POS_PDBIDS', 'NEG_PDBIDS'), nargs=2,
                                            default=None,
                                            help='Lists PDBs containing positive/negative hits [default: None]')
