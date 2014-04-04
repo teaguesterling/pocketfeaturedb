@@ -69,8 +69,11 @@ def pocket_from_pdb(pdb_path, find_ligand=pick_best_ligand,
                               distance_threshold=6.0):
     structure = pdbfile.load_file(pdb_path)
     ligand = find_ligand(structure)
-    pocket = create_pocket_around_ligand(structure, ligand, cutoff=distance_threshold,
-                                                            residue_centers=residue_centers)
+    if ligand is not None:
+        pocket = create_pocket_around_ligand(structure, ligand, cutoff=distance_threshold,
+                                                                residue_centers=residue_centers)
+    else:
+        pocket = None
     return pocket
 
 
@@ -284,7 +287,8 @@ class GeneratePocketFeatureBackground(Task):
                         end="", file=sys.stderr)
                 sys.stderr.flush()
             pocket = pocket_from_pdb(pdb, distance_threshold=self.params.distance)
-            yield pocket
+            if pocket is not None:
+                yield pocket
         if self.params.progress:
             print("", file=sys.stderr)
 

@@ -25,7 +25,7 @@ from pocketfeature.tasks.core import Task
 
 def find_neighboring_residues(structure, queries, cutoff=6.0, 
                                                   ordered=True,
-                                                  excluded=is_ligand_residue,
+                                                  excluded=is_het_residue,
                                                   residue_centers=None,
                                                   skip_partial_residues=True):
 

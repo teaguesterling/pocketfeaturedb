@@ -17,7 +17,8 @@ residue_code_three_to_one = three_to_one
 
 IGNORED_LIGANDS = set((
     'W',
-    'SO4',
+    'H_SO4',
+    'H_PO4',
     # Add more
 ))
 
