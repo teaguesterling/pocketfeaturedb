@@ -30,7 +30,7 @@ def _get_value_columns(values, accepted, cast):
 
 class MatrixValues(OrderedDict):
     """ A cheap attempt at storing sparse matrix information """    
-    def __init__(self, entries=[], indexes=None, value_dims=None):
+    def __init__(self, entries=[], indexes=None, value_dims=None, default=None):
         if indexes is None:
             indexes = []
         self.indexes = indexes 
@@ -55,6 +55,7 @@ class MatrixValues(OrderedDict):
         self.dim_refs = dim_refs
         self.shape = [len(dim) for dim in indexes]
         self.shape = self.shape + [self.value_dims]
+        self.default = default
 
     def _get_indexer(self, i):
         try:
@@ -101,8 +102,9 @@ class MatrixValues(OrderedDict):
         items = []
         for idx in subset:
             key = tuple(indexes[i][j] for i,j in enumerate(idx))
-            value = self[key]
-            items.append((key, value))
+            if key in self:
+                value = self[key]
+                items.append((key, value))
         values = cls(items, value_dims=self.value_dims)
         return values
 

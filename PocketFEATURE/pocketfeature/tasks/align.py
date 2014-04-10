@@ -13,7 +13,8 @@ from pocketfeature.tasks.core import Task
 
 
 def align_scores_munkres(scores, cutoff):
-    score_matrix = scores.to_array()
+    filtered_scores = ((k, v) for k, v in scores.items() if v <= cutoff)
+    score_matrix = MatrixValues(filtered_scores).to_array(default=float('inf'))
     aligned = munkres_align(score_matrix, shift_negative=True, maximize=False)
     aligned_scores = scores.subset_from_indexes(aligned)
     return aligned_scores

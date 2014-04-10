@@ -89,7 +89,7 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, pdb_dir, params):
 
         task = AlignScores.from_params(
             cutoff=cutoff,
-            method='greedy',
+            method=params['alignment'],
             score_column=1,
             **job_files
         )
@@ -181,6 +181,7 @@ class BenchmarkPocketFeatureBackground(Task):
             'allowed_pairs': self.params.allowed_pairs,
             'ligandA': ligA,
             'ligandB': ligB,
+            'alignment': self.params.alignment_method,
         }
         
         all_args = ((comp_dir, pdbA, pdbB, self.cutoffs, self.params.pdb_dir, pf_params)
@@ -291,8 +292,11 @@ class BenchmarkPocketFeatureBackground(Task):
                                               default=cls.LIGAND_RESIDUE_DISTANCE,
                                               help='Residue active site distance threshold [default: %(default)s]')
         parser.add_argument('-c', '--cutoffs', metavar='CUTOFFS',
-                                              default=[.1, 0, -0.15, -0.3],
+                                              default=[.1, .1, 0, -0.15, -.23, -0.3],
                                               help='Alignment score thresholds [default: %(default)s]')
+        parser.add_argument('-A', '--alignment-method', metavar='ALIGNMENT',
+                                              default='greedy',
+                                              help='Alignment method to use [default: %(default)s]')
         parser.add_argument('-o', '--positives-out', metavar='POSITIVE_OUT',
                                                      default=cls.POS_OUT_DEFAULT,
                                                      help='Positive out scores [default: %(default)s]')

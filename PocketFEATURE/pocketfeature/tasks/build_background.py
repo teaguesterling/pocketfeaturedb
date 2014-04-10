@@ -223,7 +223,7 @@ class GeneratePocketFeatureBackground(Task):
             with open(params.background) as f:
                 bg = backgrounds.load_stats_data(f)
         else:
-            pdbs = get_pdb_list(params.pdbs, pdb_dir=self.pdb_dir, log=self.log)
+            pdbs = get_pdb_list(params.pdbs, pdb_dir=params.pdb_dir, log=self.log)
             self._num_pdbs = len(pdbs)
             log.info("Found {0} PDBs".format(self._num_pdbs))
             vectors = self.get_pocket_vectors(pdbs)
