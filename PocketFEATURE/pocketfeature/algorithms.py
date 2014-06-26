@@ -9,6 +9,23 @@ import numpy as np
 from munkres import Munkres
 
 
+def reference_cutoff_tanimoto_similarity(cutoffs, a, b, zeroed=False):
+    if zeroed:
+        raise NotImplementedError(
+            "Zeroed not implemented in reference tanimoto similarity")
+    N = len(a)
+    total = 0
+    comm = 0
+    for i, (ax, bx) in enumerate(zip(a,b)):
+        if ax != 0 or bx != 0:
+            total += 1
+            if ax - bx >= 0 and ax - bx <= cutoffs[i]:
+                comm += 1
+            elif ax - bx < 0 and bx - ax <= cutoffs[i]:
+                comm +=1
+    return comm / (2 * all - comm)
+
+
 def cutoff_tanimoto_similarity(cutoffs, a, b, zeroed=False):
     """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
         This method takes two vectors and treats each pair of elments matched

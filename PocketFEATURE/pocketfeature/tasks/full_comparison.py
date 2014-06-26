@@ -33,6 +33,94 @@ from pocketfeature.utils.args import LOG_LEVELS
 from pocketfeature.tasks.core import Task
 
 
+def load_points(pdb_file,
+                points_file,
+                pdbid=None,
+                ligands=None,
+                distance_cutoff=6.0,
+                point_cache=None,
+                link_cached=False,
+                log=logging,
+                log_label="Pocket"):
+    
+    if point_cache is not None as os.path.exists(point_cache):
+        log.info("Using cached pointfile for {label}: {cache}".format(label=log_label,
+                                                                      cache=point_cache))
+        ligand = None
+        with gzip.open(point_cache) as f:
+            points = pointfile.load(f)
+    else:
+        log.debug("Loading structure {label}".format(label=log_label))
+        structure = pdbfile.load(pdb_file, pdbid=pdbid)
+
+        log.info("Finding ligands in structure {label}".format(label=log_label))
+        if ligands is None:
+            log.debug("Guessing ligand {label}".format(label=log_label))
+            ligand = pick_best_ligand(structure)
+        else:
+            log.debug("Searching for ligand {label} ({ligands})".format(label=log_label,
+                                                                        ligands=" ".join(ligands)))
+            ligand = find_one_of_ligand_in_structure(structure, ligands)
+
+        log.debug("Creating pocket {label}".format(label=log_label))
+        pocket = create_pocket_around_ligand(structure, ligand, cutoff=distance_cutoff)
+        points = pocket.points
+        
+        if point_cache is not None:
+            log.debug("Caching pocket {label}".format(label=log_label))
+            with gzip.open(point_cache, 'w') as f:
+                pointfile.dump(points, f)
+    
+    pdb_file.close()
+    if points_file is not None:
+        if link_cached:
+            log.debug("Linking to cached pocket {label}".format(label=log_label))
+            points_file.close()
+            os.symlink(point_cache, points_file.name)
+        else:
+            log.debug("Writing pocket {label}".format(label=log_label))
+            pointfile.dump(points, points_file)
+            points_file.close()
+
+    return points, ligand
+
+
+
+def generate_featurefile(points,
+                         feature_file,
+                         pdbid=None,
+                         ligand=None,
+                         feature_cache=None,
+                         link_cached=False,
+                         log=logging,
+                         log_label="Pocket"):
+    if feature_cache is not None as os.path.exists(feature_cache):
+        log.info("Using cached featurefile for {label}: {cache}".format(label=log_label,
+                                                                        cache=feature_cache))
+        with gzip.open(feature_cache) as f:
+            features = featurefile.load(f)
+    else:
+             
+        log.debug("FEATURIZING Pocket {label}".format(label=log_label))
+        features = featurize_points(points, 
+                                    featurefile_args={
+                                        'rename_from_comment': 'DESCRIPTION'})
+        if feature_cache is not None:
+            log.debug("Caching features {label}".format(label=log_label))
+            with gzip.open(feature_cache, 'w') as f:
+                featurefile.dump(features, f)
+
+    if feature_file is not None:
+        if link_cached:
+            log.debug("Linking to cached features {label}".format(label=log_label))
+            feature_file.close()
+            os.symlink(feature_cache, feature_file.name)
+        else:
+            log.debug("Writing features {label}".format(label=log_label))
+            featurefile.dump(features, feature_file)
+            feature_file.close()
+
+
 class ComparePockets(Task):
     LIGAND_RESIDUE_DISTANCE = 6.0
     DEFAULT_CUTOFF = -0.15
@@ -56,65 +144,65 @@ class ComparePockets(Task):
         pdbidA, pdbA = guess_pdbid_from_stream(params.pdbA)
         pdbidB, pdbB = guess_pdbid_from_stream(params.pdbB)
 
-        log.debug("Loading structure A")
-        structureA = pdbfile.load(pdbA, pdbid=pdbidA)
-        log.debug("Loading structure B")
-        structureB = pdbfile.load(pdbB, pdbid=pdbidB)
+        ligandA = params.ligandA
+        if ligandA is not None:
+            ligandA = params.ligandA.split(',')
 
-        log.info("Finding ligands")
-        if params.ligandA is None:
-            log.debug("Guessing ligand A")
-            ligandA = pick_best_ligand(structureA)
-        else:
-            ligandsA = params.ligandA.split(',')
-            log.debug("Searching for ligand A ({0})".format(" ".join(ligandsA)))
-            ligandA = find_one_of_ligand_in_structure(structureA, ligandsA)
+        ligandB = params.ligandB
+        if ligandB is not None:
+            ligandB = params.ligandB.split(',')
 
-        if params.ligandB is None:
-            log.debug("Guessing ligand B")
-            ligandB = pick_best_ligand(structureB)
-        else:
-            ligandsB = params.ligandB.split(',')
-            log.debug("Searching for ligand B ({0})".format(" ".join(ligandsB)))
-            ligandB = find_one_of_ligand_in_structure(structureB, ligandsB)
-        
-        if None in (ligandA, ligandB):
-            log.error("Could not find both ligands")
-            return -1
-        
-        log.info("Creating pockets")
-        log.debug("Creating pocket A")
-        pocketA = create_pocket_around_ligand(structureA, ligandA, cutoff=params.distance)
-        if params.ptfA is not None:
-            log.debug("Writing pocket A")
-            pointfile.dump(pocketA.points, params.ptfA)
-            params.ptfA.close()
-        log.debug("Creating pocket B")
-        pocketB = create_pocket_around_ligand(structureB, ligandB, cutoff=params.distance)
-        if params.ptfB is not None:
-            log.debug("Writing pocket B")
-            pointfile.dump(pocketB.points, params.ptfB)
-            params.ptfB.close()
+        ptfA_cache_file = None
+        ptfB_cache_file = None
+        if params.ptf_cache:
+            log.debug("Checking for cached point files in: {0}".format(params.ptf_cache))
+            ptfA_cache_file = params.ptf_cache.format(pdbid=pdbidA)
+            ptfB_cache_file = params.ptf_cache.format(pdbid=pdbidB)
+
+        log.info("Identifying Pocket Points")
+
+        pointsA, ligandA = load_points(pdb_file=pdbA,
+                                       pdbid=pdbidA,
+                                       points_file=params.ptfA,
+                                       ligands=ligandsA,
+                                       distance_cutoff=params.distance,
+                                       point_cache=ptfA_cache_file
+                                       link_cached=params.link_cached,
+                                       log=log,
+                                       log_label='A')
+
+        pointsB, ligandB = load_points(pdb_file=pdbB,
+                                       pdbid=pdbidB,
+                                       points_file=params.ptfB,
+                                       ligands=ligandsB,
+                                       distance_cutoff=params.distance,
+                                       point_cache=ptfB_cache_file
+                                       link_cached=params.link_cached,
+                                       log=log,
+                                       log_label='B')
+                              
+        log.info("Generating FEATURE vectors")
+        ffA_cache_file = None
+        ffB_cache_file = None
+        if params.ff_cache:
+            log.debug("Checking for cached FEATURE files in: {0}".format(params.ptf_cache))
+            ffA_cache_file = params.ff_cache.format(pdbid=pdbidA)
+            ffB_cache_file = params.ff_cache.format(pdbid=pdbidB)
+
+        featurefileA = generate_featurefile(points=pointsA,
+                                            feature_cache=ffA_cache_file,
+                                            link_cached=params.link_cached,
+                                            log=log,
+                                            log_label='A')
+
+        featurefileB = generate_featurefile(points=pointsB,
+                                            feature_cache=ffB_cache_file,
+                                            link_cached=params.link_cached,
+                                            log=log,
+                                            log_label='B')
     
-        log.info("FEATURIZING Pockets")
-        log.debug("FEATURIZING Pocket A")
-        featurefileA = featurize_points(pocketA.points, 
-                                        featurefile_args={
-                                            'rename_from_comment': 'DESCRIPTION'})
         _numA = len(featurefileA.vectors)
-        if params.ffA is not None:
-            log.debug("Wring FEATURE file A")
-            featurefile.dump(featurefileA, params.ffA)
-            params.ffA.close()
-        log.debug("FEATURIZING Pocket B")
-        featurefileB = featurize_points(pocketB.points,
-                                        featurefile_args={
-                                            'rename_from_comment': 'DESCRIPTION'})
         _numB = len(featurefileB.vectors)
-        if params.ffB is not None:
-            log.debug("Wring FEATURE file B")
-            featurefile.dump(featurefileB, params.ffB)
-            params.ffB.close()
     
         log.info("Comparing Vectors")
         scores = background.get_comparison_matrix(featurefileA, featurefileB)
@@ -244,6 +332,28 @@ class ComparePockets(Task):
                                      default=None,
                                      nargs='?',
                                      help='Path to second FEATURE file [default: None]')
+        parser.add_argument('--pft-cache', metavar='PTF_CACHE_TPL',
+                                           type=str,
+                                           default=None,
+                                           nargs='?',
+                                           help='Pattern to check for cached point files'
+                                                ' (variables: {pdbid, ligid})'
+                                                ' [default: None]')
+        parser.add_argument('--ff-cache', metavar='FF_CACHE_TPL',
+                                          type=str,
+                                          default=None,
+                                          nargs='?',
+                                          help='Pattern to check for cached FEATURE files'
+                                               ' (variables: {pdbid, ligid})'
+                                               ' [default: None]')
+        parser.add_argument('--check-cached-first', type=bool, 
+                                                    default=False,
+                                                    action='store_true',
+                                                    help='Check for cache before extracting ligand')
+        parser.add_argument('--link-cached', type=bool, 
+                                             default=False,
+                                             action='store_true',
+                                             help='Link cache files when found')
         parser.add_argument('--raw-scores', metavar='SCORES',
                                             type=FileType.compressed('w'),
                                             default=None,

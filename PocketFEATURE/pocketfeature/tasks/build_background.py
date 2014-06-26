@@ -70,8 +70,10 @@ def pocket_from_pdb(pdb_path, find_ligand=pick_best_ligand,
     structure = pdbfile.load_file(pdb_path)
     ligand = find_ligand(structure)
     if ligand is not None:
-        pocket = create_pocket_around_ligand(structure, ligand, cutoff=distance_threshold,
-                                                                residue_centers=residue_centers)
+        pocket = create_pocket_around_ligand(structure, 
+                                             ligand, 
+                                             cutoff=distance_threshold,
+                                             residue_centers=residue_centers)
     else:
         pocket = None
     return pocket

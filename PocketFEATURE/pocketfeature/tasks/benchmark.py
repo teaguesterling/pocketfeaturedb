@@ -36,8 +36,15 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, pdb_dir, params):
     pdbidB = pdbidFromFilename(pdbB)
     key = (pdbidA, pdbidB)
     token = "{0}-{1}".format(pdbidA, pdbidB)
+    ff_cache_dir = params.get('ff_cache', '/dev/null')
     comp_dir = os.path.join(root, token)
     os.makedirs(comp_dir)
+
+    ffCacheA = os.path.join(ff_cache_dir, pdbidA + ".ff")
+    ffCacheA = os.path.join(ff_cache_dir, pdbidB + ".ff")
+    ffA = 
+    if os.path.exists(ffCacheA):
+        os.
 
     buf = StringIO()
     job_files = {
@@ -112,6 +119,7 @@ class BenchmarkPocketFeatureBackground(Task):
     BACKGROUND_FF_DEFAULT = 'background.ff'
     BACKGROUND_COEFF_DEFAULT = 'background.coeffs'
     TEMP_BENCH_DIR_DEFAULT = os.path.join(os.getcwd(), 'bench')
+    TEMP_FF_DIR_DEFAULT = os.path.join(os.getcwd(), 'ff')
     POS_OUT_DEFAULT = 'positives.scores'
     CONT_OUT_DEFAULT = 'control.scores'
     LIGAND_RESIDUE_DISTANCE = 6.0
