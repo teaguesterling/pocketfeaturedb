@@ -30,6 +30,25 @@
 #
 #
 
+
+echo "Cleaning up old versions"
+pip uninstall pyFEATURE PocketFEATURE
+
+set -e
+
+if [ ! -z $VIRTUAL_ENV -a ! -d $VIRTUAL_ENV/lib/python2.7/site-packages/numpy/core/include ]; then
+    echo "Fixing Numpy/Virtualenv issues"
+    pip install --force-reinstall --upgrade numpy
+fi
+
+echo "Checking for FEATURE"
+if [ ! $( which featurize ) ]; then
+    echo "Warning: featurize not found in PATH. Likely to fail"
+    echo "Press any key to continue..."
+    read
+fi
+    
+
 echo "INSTALLING pyFEATURE"
 cd pyFEATURE
 python setup.py install
@@ -43,6 +62,18 @@ cd ../
 echo "RUNNING SANITY TEST"
 export PDB_DIR="./data"
 export DSSP_DIR="./data"
-run_pf data/1qhx.pdb data/1qrd.pdb -b data/background.ff -n data/background.coeffs --pymolA=/tmp/1qhx.py --pymolB=/tmp/1qrd.py
-pymol -l /tmp/1qhx.py &
-pymol -l /tmp/1qrd.py &
+run_pf data/1qhx.pdb data/1qrd.pdb \
+       -b data/background.ff \
+       -n data/background.coeffs \
+       --pymolA=/tmp/1qhx.py \
+       --pymolB=/tmp/1qrd.py
+
+echo "Attempting to visualize"
+if [ $( which pymol ) ]; then
+    pymol -l /tmp/1qhx.py &
+    pymol -l /tmp/1qrd.py &
+else
+    echo "PyMol not found in PATH. Cannot display alignment"
+    echo "pymol -l /tmp/1qhx.py &"
+    echo "pymol -l /tmp/1qrd.py &"
+fi
