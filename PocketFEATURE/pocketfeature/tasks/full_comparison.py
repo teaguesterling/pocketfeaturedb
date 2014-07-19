@@ -43,7 +43,7 @@ def load_points(pdb_file,
                 log=logging,
                 log_label="Pocket"):
     
-    if point_cache is not None as os.path.exists(point_cache):
+    if point_cache is not None and os.path.exists(point_cache):
         log.info("Using cached pointfile for {label}: {cache}".format(label=log_label,
                                                                       cache=point_cache))
         ligand = None
@@ -94,7 +94,7 @@ def generate_featurefile(points,
                          link_cached=False,
                          log=logging,
                          log_label="Pocket"):
-    if feature_cache is not None as os.path.exists(feature_cache):
+    if feature_cache is not None and os.path.exists(feature_cache):
         log.info("Using cached featurefile for {label}: {cache}".format(label=log_label,
                                                                         cache=feature_cache))
         with gzip.open(feature_cache) as f:
@@ -119,6 +119,8 @@ def generate_featurefile(points,
             log.debug("Writing features {label}".format(label=log_label))
             featurefile.dump(features, feature_file)
             feature_file.close()
+
+    return features
 
 
 class ComparePockets(Task):
@@ -164,9 +166,9 @@ class ComparePockets(Task):
         pointsA, ligandA = load_points(pdb_file=pdbA,
                                        pdbid=pdbidA,
                                        points_file=params.ptfA,
-                                       ligands=ligandsA,
+                                       ligands=ligandA,
                                        distance_cutoff=params.distance,
-                                       point_cache=ptfA_cache_file
+                                       point_cache=ptfA_cache_file,
                                        link_cached=params.link_cached,
                                        log=log,
                                        log_label='A')
@@ -174,9 +176,9 @@ class ComparePockets(Task):
         pointsB, ligandB = load_points(pdb_file=pdbB,
                                        pdbid=pdbidB,
                                        points_file=params.ptfB,
-                                       ligands=ligandsB,
+                                       ligands=ligandB,
                                        distance_cutoff=params.distance,
-                                       point_cache=ptfB_cache_file
+                                       point_cache=ptfB_cache_file,
                                        link_cached=params.link_cached,
                                        log=log,
                                        log_label='B')
@@ -190,12 +192,16 @@ class ComparePockets(Task):
             ffB_cache_file = params.ff_cache.format(pdbid=pdbidB)
 
         featurefileA = generate_featurefile(points=pointsA,
+                                            feature_file=params.ffA,
+                                            pdbid=pdbidA,
                                             feature_cache=ffA_cache_file,
                                             link_cached=params.link_cached,
                                             log=log,
                                             log_label='A')
 
         featurefileB = generate_featurefile(points=pointsB,
+                                            feature_file=params.ffB,
+                                            pdbid=pdbidB,
                                             feature_cache=ffB_cache_file,
                                             link_cached=params.link_cached,
                                             log=log,
@@ -332,7 +338,7 @@ class ComparePockets(Task):
                                      default=None,
                                      nargs='?',
                                      help='Path to second FEATURE file [default: None]')
-        parser.add_argument('--pft-cache', metavar='PTF_CACHE_TPL',
+        parser.add_argument('--ptf-cache', metavar='PTF_CACHE_TPL',
                                            type=str,
                                            default=None,
                                            nargs='?',
@@ -346,12 +352,22 @@ class ComparePockets(Task):
                                           help='Pattern to check for cached FEATURE files'
                                                ' (variables: {pdbid, ligid})'
                                                ' [default: None]')
-        parser.add_argument('--check-cached-first', type=bool, 
-                                                    default=False,
+        parser.add_argument('--pdb-dir', metavar='PDB_DIR',
+                                         type=str,
+                                         default=environ.get('PDB_DIR'),
+                                         nargs='?',
+                                         help='Directory in which to search for PDB files'
+                                              ' [default: %(default)s')
+        parser.add_argument('--dssp-dir', metavar='DSSP_DIR',
+                                          type=str,
+                                          default=environ.get('DSSP_DIR'),
+                                          nargs='?',
+                                          help='Directory in which to search for DSSP files'
+                                              ' [default: %(default)s')
+        parser.add_argument('--check-cached-first', default=False,
                                                     action='store_true',
                                                     help='Check for cache before extracting ligand')
-        parser.add_argument('--link-cached', type=bool, 
-                                             default=False,
+        parser.add_argument('--link-cached', default=False,
                                              action='store_true',
                                              help='Link cache files when found')
         parser.add_argument('--raw-scores', metavar='SCORES',

@@ -19,6 +19,7 @@ setup(name='PocketFEATURE',
       zip_safe=True,
       install_requires=[
           'numpy>=1.6.2',
+          'scipy>=0.7.0',
           'biopython>=1.58',
           'munkres>=1.0.6',
           'pyFEATURE>=0.1dev',

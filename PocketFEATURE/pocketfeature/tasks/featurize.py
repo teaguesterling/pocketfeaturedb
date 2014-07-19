@@ -4,7 +4,11 @@ from __future__ import print_function
 import os
 import sys
 
-from feature.backends.wrappers import featurize_points_raw
+try:
+    from feature.backends.wrappers import featurize_points_raw
+except ImportError as e:
+    def featurize_points_raw(*args, **kwargs):
+        raise e
 
 from pocketfeature.io import featurefile
 from pocketfeature.tasks.core import Task
@@ -58,17 +62,22 @@ def namespace_from_dict(data):
 
 class Featurize(Task):
     def run(self):
-        environ = os.environ
+        environ = dict(os.environ.items())
         namespace = self.params
         update_environ_from_namespace(environ, namespace)
         args, kwargs = extract_feature_args_from_namespace(namespace)
+
         from feature.backends.external import featurize
+        kwargs['environ'] = environ  # Used internally to set _env
         kwargs['_out'] = sys.stdout
         kwargs['_err'] = sys.stderr
+        if namespace.P is not None:
+            kwargs['_in'] = sys.stdin
         try:
             featurize(*args, **kwargs)
             return 0
-        except:
+        except Exception as e:
+            raise
             return -1
 
     @classmethod
@@ -86,6 +95,7 @@ class Featurize(Task):
         parser.add_argument('-x', metavar='HETATMS', nargs='?', default=None)
         parser.add_argument('-l', metavar='PROPERTYFILE', nargs='?', default=None)
         parser.add_argument('-s', metavar='SEARCH_DIR', nargs='?', default=None)
+        parser.add_argument('-v', action='store_true', default=False)
         
         parser.add_argument('--feature-root', metavar='FEATURE_ROOT', nargs='?', default=None)
         parser.add_argument('--feature-dir', metavar='FEATURE_DIR', nargs='?', default=None)
