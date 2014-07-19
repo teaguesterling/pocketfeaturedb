@@ -69,14 +69,34 @@ default_environ.update({
 raw_which = sh.Command('which')
 
 
+def _update_default_environ_from_feature_path(found_path):
+    if not os.path.exists(default_environ['FEATURE_DIR']):
+        
+        feature_dir_file = 'amberM2_params.dat'
+        feature_dir_checks = ('', '../', '../data')
+        found_base = os.path.dirname(found_path)
+        for check_dir in feature_dir_checks:
+            feature_dir = os.path.join(found_base, check_dir)
+            feature_dir_check = os.path.join(feature_dir, feature_dir_file)
+            if os.path.exists(feature_dir_check):
+                feature_dir_path = os.path.abspath(feature_dir)
+                default_environ['FEATURE_DIR'] = feature_dir_path
+                break
+            
+
+
 def locate_subprocess_binary(name, expected_path, raise_error=True, 
-                                                  environ=default_environ):
+                                                  environ=default_environ,
+                                                  on_found_callback=None):
     try:
         if os.path.exists(expected_path):
-            return sh.Command(expected_path)
+            found_path = expected_path
         else:
-            found_path = raw_which(name, _env=environ)
-            return sh.Command(found_path)
+            found_path = raw_which(name, _env=environ).stdout.strip()
+        cmd = sh.Command(found_path)
+        if on_found_callback is not None:
+            on_found_callback(found_path)
+        return cmd
     except (sh.CommandNotFound, sh.ErrorReturnCode):
         def error(*args, **kwargs):
             raise NotImplementedError("{0} not available in {1}".format(
@@ -118,7 +138,8 @@ raw_dssp = locate_subprocess_binary(DSSP_NAME, DSSP_BIN, raise_error=False)
             Read point list from POINTFILE
         -H  Print header
 """
-raw_featurize = locate_subprocess_binary('featurize', FEATURIZE_BIN)
+raw_featurize = locate_subprocess_binary('featurize', FEATURIZE_BIN,
+                                         on_found_callback=_update_default_environ_from_feature_path)
 
 
 def generate_dssp_file(pdb_file, dssp_file=None, environ=None, **exec_params):
