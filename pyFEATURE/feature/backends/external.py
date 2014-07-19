@@ -20,13 +20,13 @@ import sh
 
 SCRATCH_DIR = '/tmp'
 
-REQUIRED_ENVIRONMENT = ('FEATURE_DIR', 'PDB_DIR', 'DSSP_DIR')
+REQUIRED_ENVIRONMENT = ('FEATURE_DIR',)
 
 FEATURE_ROOT = os.environ.get('FEATURE_ROOT', '/usr/local/feature')
 
 # Using bundled FEATURE in case nothing was found
-#if not os.path.exists(FEATURE_ROOT):
-FEATURE_ROOT = os.path.join(sys.prefix, 'opt', 'feature')
+if not os.path.exists(FEATURE_ROOT):
+    FEATURE_ROOT = os.path.join(sys.prefix, 'opt', 'feature')
 
 FEATURE_DIR = os.environ.get('FEATURE_DIR', os.path.join(FEATURE_ROOT, 'data'))
 FEATURE_BIN = os.environ.get('FEATURE_BIN', os.path.join(FEATURE_ROOT, 'bin'))
@@ -51,8 +51,7 @@ AUGMENTED_PATH = os.pathsep.join((FEATURE_BIN,
     This sets environmental variables expected by the FEATURE binaries
     as well as updating the path to allow locating of the FEAUTRE binaries
 """
-default_environ = os.environ.copy()
-default_environ.update({
+feature_environ = {
     # Add external script path to environment PATH so external scripts
     # can find 'featurize'
     'PATH': AUGMENTED_PATH,
@@ -64,7 +63,9 @@ default_environ.update({
     # for a search path
     'PDB_DIR': DEFAULT_PDB_DIR,    # Default PDB Dir (To Override)
     'DSSP_DIR': DEFAULT_DSSP_DIR,  # Default DSSP Dir (To Override)
-})
+}
+default_environ = os.environ.copy()
+default_environ.update(feature_environ)
 
 raw_which = sh.Command('which')
 
@@ -80,9 +81,11 @@ def _update_default_environ_from_feature_path(found_path):
             feature_dir_check = os.path.join(feature_dir, feature_dir_file)
             if os.path.exists(feature_dir_check):
                 feature_dir_path = os.path.abspath(feature_dir)
+
                 default_environ['FEATURE_DIR'] = feature_dir_path
-                break
-            
+                feature_environ['FEATURE_DIR'] = feature_dir_path
+                FEATURE_DIR = feature_dir_path
+                return
 
 
 def locate_subprocess_binary(name, expected_path, raise_error=True, 
@@ -206,9 +209,13 @@ def featurize(shells=None,
 
     if environ is None:
         environ = default_environ
+    else:
+        for key, value in feature_environ.iteritems():
+            if key not in environ:
+                environ[key] = value
     
     for variable in REQUIRED_ENVIRONMENT:
-        if variable not in environ or not os.path.exists(environ.get(variable)):
+        if variable not in environ:
             raise RuntimeError("Required environmental variable {} not available".format(variable))
 
     exec_params['_env'] = environ
@@ -251,7 +258,8 @@ def featurize(shells=None,
     else:
         if '_err' not in exec_params:
             exec_params['_err'] = os.devnull
-        return raw_featurize(*exec_args, **exec_params)
+        results = raw_featurize(*exec_args, **exec_params)
+        return results
 
 
 def featurize_pointfile(point_file=None,
