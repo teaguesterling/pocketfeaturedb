@@ -24,6 +24,9 @@ from feature.io.locate_files import (
 
 from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity,
+    reference_cutoff_tanimoto_similarity,
+    adjusted_reference_cutoff_tanimoto_similarity,
+    cutoff_modified_tanimoto_similarity,
     GaussianStats,
     unique_product,
 )
@@ -46,6 +49,9 @@ from pocketfeature.tasks.pocket import (
 from pocketfeature.utils.args import LOG_LEVELS
 from pocketfeature.utils.ff import get_vector_type
 from pocketfeature.utils.pdb import guess_pdbid_from_stream
+
+
+compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
 
 
 @contextlib.contextmanager
@@ -127,7 +133,7 @@ def calculate_residue_pair_normalization(key, std_dev, fileA, fileB):
         for vectorA, vectorB in pairs:
             a = vectorA.features
             b = vectorB.features
-            raw_score = cutoff_tanimoto_similarity(std, a, b)
+            raw_score = compute_raw_cutoff_similarity(std, a, b)
             stats.record(raw_score)
 
     mode = mean = float(stats.mean)  # Mean == Mode for Gaussian

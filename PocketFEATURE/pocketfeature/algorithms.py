@@ -9,12 +9,11 @@ import numpy as np
 from munkres import Munkres
 
 
-def reference_cutoff_tanimoto_similarity(cutoffs, a, b, zeroed=False):
-    if zeroed:
+def reference_cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
+    if check_sign:
         raise NotImplementedError(
-            "Zeroed not implemented in reference tanimoto similarity")
-    N = len(a)
-    total = 0
+            "Sign check not implemented in reference tanimoto similarity")
+    total = 0  # $all -> total
     comm = 0
     for i, (ax, bx) in enumerate(zip(a,b)):
         if ax != 0 or bx != 0:
@@ -23,10 +22,34 @@ def reference_cutoff_tanimoto_similarity(cutoffs, a, b, zeroed=False):
                 comm += 1
             elif ax - bx < 0 and bx - ax <= cutoffs[i]:
                 comm +=1
-    return comm / (2 * all - comm)
+    if total == 0:
+        return 0.
+    else:
+        return comm / (total * 2 - comm)
 
 
-def cutoff_tanimoto_similarity(cutoffs, a, b, zeroed=False):
+def adjusted_reference_cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
+    if check_sign:
+        raise NotImplementedError(
+            "Sign check not implemented in reference tanimoto similarity")
+    N = len(a)
+    total = 0
+    comm = 0
+    for i, (ax, bx) in enumerate(zip(a,b)):
+        if ax != 0 or bx != 0:
+            total += 1
+            delta = ax - bx
+            if delta >= 0 and delta <= cutoffs[i]:
+                comm += 1
+            elif delta < 0 and -delta <= cutoffs[i]:
+                comm +=1
+    if total == 0:
+        return 0.
+    else:
+        return comm / total
+
+
+def cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
     """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
         This method takes two vectors and treats each pair of elments matched
         they differ by less than the supplied cutoff for that index.
@@ -36,17 +59,42 @@ def cutoff_tanimoto_similarity(cutoffs, a, b, zeroed=False):
         If zeroed is false, the elements also need the same sign.
     """
     union = np.logical_or(a != 0, b != 0)
-    if not zeroed:
-        same_sign = np.sign(a) == np.sign(b)
-        union = np.logical_and(same_sign, union)
     union_size = np.count_nonzero(union)
+    shared = union
+    if check_sign:
+        same_sign = np.sign(a) == np.sign(b)
+        shared = np.logical_and(same_sign, union)
     if union_size > 0:
-        delta = np.abs(a[union] - b[union])
-        intersection = delta < cutoffs[union]
+        delta = np.abs(a[shared] - b[shared])
+        intersection = delta < cutoffs[shared]
         intersection_size = np.count_nonzero(intersection)
         return intersection_size / union_size
     else:
-        return 0
+        return 0.
+
+
+def cutoff_modified_tanimoto_similarity(cutoffs, a, b, check_sign=False):
+    """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
+        This method takes two vectors and treats each pair of elments matched
+        they differ by less than the supplied cutoff for that index.
+        The number matched elements is then divided by the total number of
+        elements "present" (e.g. non-zero) and this value returned as 
+        the score.
+        If zeroed is false, the elements also need the same sign.
+    """
+    union = np.logical_or(a != 0, b != 0)
+    union_size = np.count_nonzero(union)
+    shared = union
+    if check_sign:
+        same_sign = np.sign(a) == np.sign(b)
+        shared = np.logical_and(same_sign, union)
+    if union_size > 0:
+        delta = np.abs(a[shared] - b[shared])
+        intersection = delta < cutoffs[shared]
+        intersection_size = np.count_nonzero(intersection)
+        return intersection_size / (2 * union_size - intersection_size)
+    else:
+        return 0.
 
 
 def normalize_score(score, mode):
