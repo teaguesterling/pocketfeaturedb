@@ -88,7 +88,8 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
     results = matrixvaluesfile.load(buf, cast=float)
     scores = results.values()
     for f in job_files.values():
-        f.close()
+        if hasattr(f, 'close'):
+            f.close()
 
     for cutoff in cutoffs:
         align_path = os.path.join(comp_dir, token + '_{0}.align'.format(cutoff))
@@ -143,14 +144,17 @@ class BenchmarkPocketFeatureBackground(Task):
         if isinstance(self.cutoffs, basestring):
             self.cutoffs = sorted(map(float, self.cutoffs.split(',')), reverse=True)
 
+
+
+        cache_dir = os.path.join(params.bench_dir, 'cache')
         if params.ff_cache:
             self.ff_cache = params.ff_cache
         else:
-            self.ff_cache = os.path.join(params.bench_dir, 'cache')
+            self.ff_cache = os.path.join(cache_dir, '{signature}.ff.gz')
         if params.ptf_cache:
             self.ptf_cache = params.ptf_cache
         else:
-            self.ptf_cache = os.path.join(params.bench_dir, 'cache')
+            self.ptf_cache = os.path.join(cache_dir, '{pdbid}.ptf.gz')
 
         log.info("PDB_DIR is {0}".format(params.pdb_dir))
         log.info("DSSP_DIR is {0}".format(params.dssp_dir))
@@ -172,6 +176,8 @@ class BenchmarkPocketFeatureBackground(Task):
             else:
                 log.debug("Creating directory {0}".format(params.bench_dir))
                 os.makedirs(params.bench_dir)
+        if not os.path.exists(cache_dir):
+	        os.makedirs(cache_dir)
 
                 
         self.positive_stats = self.compare_positives()
@@ -213,14 +219,15 @@ class BenchmarkPocketFeatureBackground(Task):
             'ff_cache': self.ff_cache,
             'ptf_cache': self.ptf_cache,
         }
+        self.failed_scores = 0
+        self.successful_scores = 0
         
-        all_args = ((comp_dir, 
-                     pdbA, pdbB, 
+        all_args = [(comp_dir, 
+                     pdbA, 
+                     pdbB, 
                      self.cutoffs, 
-                     self.params.pdb_dir, 
-                     self.params.dssp_dir,
                      pf_params)
-                    for pdbA, pdbB in pairs)
+                    for pdbA, pdbB in pairs]
 
         if self.params.num_processors is not None and self.params.num_processors > 1:
             pool = multiprocessing.Pool(self.params.num_processors)
@@ -231,10 +238,17 @@ class BenchmarkPocketFeatureBackground(Task):
         all_scores = self.record_scores(all_scores, output)
 
         for idx, (key, score) in enumerate(all_scores, start=1):
-            print("\r{0} of {1} {2} scores computed ({3})".format(
-                    idx, num_comps, comp_name, ":".join(key)), end="", file=sys.stderr)
+            print("\r{0} of {1} {2} alignments computed ({3} successful, {4} failed) ({5}) ".format(
+                    idx, 
+                    num_comps, 
+                    comp_name, 
+                    self.successful_scores,
+                    self.failed_scores,
+                    ":".join(key)), end="", file=sys.stderr)
             stats.record(score)
         print("", file=sys.stderr)
+
+        all_scores = list(all_scores)
 
         with open(output) as f:
             scores = matrixvaluesfile.load(f, value_dims=self.cutoffs)
@@ -272,8 +286,10 @@ class BenchmarkPocketFeatureBackground(Task):
             for item in scores:
                 key, values = item
                 if values is None:
+                    self.failed_scores += 1
                     self.log.error("Failure to compare {0}".format(":".join(key)))
                 else:
+                    self.successful_scores += 1
                     passthough = PassThroughItems([item])
                     matrixvaluesfile.dump(passthough, f)
                     yield item
@@ -347,6 +363,12 @@ class BenchmarkPocketFeatureBackground(Task):
         parser.add_argument('-r', '--resume', action='store_true',
                                               default=False,
                                               help='Resume with existing files if possible [default: %(default)s]')
+        parser.add_argument('--ff-cache', metavar='FF_CACHE_DIR', 
+                                          help='Directory to cache FEATURE vectors [default: BENCH_DIR/cache]',
+                                          default=None)
+        parser.add_argument('--ptf-cache', metavar='PTF_CACHE_DIR', 
+                                           help='Directory to cache Point files [default: BENCH_DIR/cache]',
+                                           default=None)
         parser.add_argument('-P', '--num-processors', metavar='PROCS',
                                                       default=1,
                                                       type=int,

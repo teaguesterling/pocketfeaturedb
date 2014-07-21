@@ -7,6 +7,7 @@ import os
 from feature.io import (
     pointfile,
 )
+from feature.io.common import open_compressed
 
 from pocketfeature.io import (
     backgrounds,
@@ -50,7 +51,7 @@ def load_points(pdb_file,
         log.info("Using cached pointfile for {label}: {cache}".format(label=log_label,
                                                                       cache=point_cache))
         ligand = None
-        with gzip.open(point_cache) as f:
+        with open_compressed(point_cache) as f:
             points = pointfile.load(f)
     else:
         log.debug("Loading structure {label}".format(label=log_label))
@@ -65,21 +66,28 @@ def load_points(pdb_file,
                                                                         ligands=" ".join(ligands)))
             ligand = find_one_of_ligand_in_structure(structure, ligands)
 
+        if ligand is None:
+            log.warn("No ligand found in pocket {label}".format(label=log_label))
+            return None, None
+
         log.debug("Creating pocket {label}".format(label=log_label))
         pocket = create_pocket_around_ligand(structure, ligand, cutoff=distance_cutoff)
-        points = pocket.points
+        points = list(pocket.points)
         
         if point_cache is not None:
             log.debug("Caching pocket {label}".format(label=log_label))
-            with gzip.open(point_cache, 'w') as f:
+            with open_compressed(point_cache, 'w') as f:
                 pointfile.dump(points, f)
     
     pdb_file.close()
     if points_file is not None:
         if link_cached:
-            log.debug("Linking to cached pocket {label}".format(label=log_label))
             points_file.close()
-            os.symlink(point_cache, points_file.name)
+            original_name = points_file.name
+            if not os.path.exists(original_name) and os.path.getsize(original_name) == 0:
+                log.debug("Linking to cached pocket {label}".format(label=log_label))
+                os.unlink(original_name)
+                os.symlink(point_cache, original_name)
         else:
             log.debug("Writing pocket {label}".format(label=log_label))
             pointfile.dump(points, points_file)
@@ -91,8 +99,6 @@ def load_points(pdb_file,
 
 def generate_featurefile(points,
                          feature_file,
-                         pdbid=None,
-                         ligand=None,
                          feature_cache=None,
                          link_cached=False,
                          environ=os.environ,
@@ -101,25 +107,29 @@ def generate_featurefile(points,
     if feature_cache is not None and os.path.exists(feature_cache):
         log.info("Using cached featurefile for {label}: {cache}".format(label=log_label,
                                                                         cache=feature_cache))
-        with gzip.open(feature_cache) as f:
+        with open_compressed(feature_cache) as f:
             features = featurefile.load(f)
     else:
              
         log.debug("FEATURIZING Pocket {label}".format(label=log_label))
         features = featurize_points(points, 
+                                    featurize_args={
+                                        'environ': environ},
                                     featurefile_args={
                                         'rename_from_comment': 'DESCRIPTION'})
         if feature_cache is not None:
             log.debug("Caching features {label}".format(label=log_label))
-            with gzip.open(feature_cache, 'w') as f:
+            with open_compressed(feature_cache, 'w') as f:
                 featurefile.dump(features, f)
 
     if feature_file is not None:
         if link_cached:
-            log.debug("Linking to cached features {label}".format(label=log_label))
             feature_file.close()
-            feature_filename = os.path.basename(feature_file.name)
-            os.symlink(feature_cache, feature_filename)
+            original_name = feature_file.name
+            if not os.path.exists(original_name) and os.path.getsize(original_name) == 0:
+                log.debug("Linking to cached features {label}".format(label=log_label))
+                os.unlink(original_name)
+                os.symlink(original_cache, original_name)
         else:
             log.debug("Writing features {label}".format(label=log_label))
             featurefile.dump(features, feature_file)
@@ -133,6 +143,8 @@ class ComparePockets(Task):
     DEFAULT_CUTOFF = -0.15
     BACKGROUND_FF_DEFAULT = 'background.ff'
     BACKGROUND_COEFF_DEFAULT = 'background.coeffs'
+
+    COULD_NOT_FIND_POCKET = 1
 
     def run(self):
         params = self.params
@@ -191,6 +203,9 @@ class ComparePockets(Task):
                                        log=log,
                                        log_label='B')
 
+        if pointsA is None or pointsB is None:
+            return self.COULD_NOT_FIND_POCKET
+
         log.info("Extrating pocket names")
         pointsA = list(pointsA)
         pointsB = list(pointsB)
@@ -208,12 +223,11 @@ class ComparePockets(Task):
         ffB_cache_file = None
         if params.ff_cache:
             log.debug("Checking for cached FEATURE files in: {0}".format(params.ff_cache))
-            ffA_cache_file = params.ff_cache.format(pdbid=pdbidA)
-            ffB_cache_file = params.ff_cache.format(pdbid=pdbidB)
+            ffA_cache_file = params.ff_cache.format(pdbid=pdbidA, signature=signature_stringA)
+            ffB_cache_file = params.ff_cache.format(pdbid=pdbidB, signature=signature_stringB)
 
         featurefileA = generate_featurefile(points=pointsA,
                                             feature_file=params.ffA,
-                                            pdbid=pdbidA,
                                             feature_cache=ffA_cache_file,
                                             link_cached=params.link_cached,
                                             environ=environ,
@@ -222,7 +236,6 @@ class ComparePockets(Task):
 
         featurefileB = generate_featurefile(points=pointsB,
                                             feature_file=params.ffB,
-                                            pdbid=pdbidB,
                                             feature_cache=ffB_cache_file,
                                             link_cached=params.link_cached,
                                             environ=environ,
@@ -365,14 +378,14 @@ class ComparePockets(Task):
                                            default=None,
                                            nargs='?',
                                            help='Pattern to check for cached point files'
-                                                ' (variables: {pdbid, ligid})'
+                                                ' (variables: {pdbid})'
                                                 ' [default: None]')
         parser.add_argument('--ff-cache', metavar='FF_CACHE_TPL',
                                           type=str,
                                           default=None,
                                           nargs='?',
                                           help='Pattern to check for cached FEATURE files'
-                                               ' (variables: {pdbid, ligid})'
+                                               ' (variables: {pdbid, ligid, signature})'
                                                ' [default: None]')
         parser.add_argument('--pdb-dir', metavar='PDB_DIR',
                                          type=str,
