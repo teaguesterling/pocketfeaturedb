@@ -25,7 +25,10 @@ from pocketfeature.tasks.align import (
     align_scores_greedy,
     align_scores_munkres,
 )
-from pocketfeature.tasks.featurize import featurize_points
+from pocketfeature.tasks.featurize import (
+    featurize_points,
+    update_environ_from_namespace,
+)
 from pocketfeature.tasks.visualize import create_alignment_visualizations
 from pocketfeature.utils.pdb import guess_pdbid_from_stream
 
@@ -92,6 +95,7 @@ def generate_featurefile(points,
                          ligand=None,
                          feature_cache=None,
                          link_cached=False,
+                         environ=os.environ,
                          log=logging,
                          log_label="Pocket"):
     if feature_cache is not None and os.path.exists(feature_cache):
@@ -114,7 +118,8 @@ def generate_featurefile(points,
         if link_cached:
             log.debug("Linking to cached features {label}".format(label=log_label))
             feature_file.close()
-            os.symlink(feature_cache, feature_file.name)
+            feature_filename = os.path.basename(feature_file.name)
+            os.symlink(feature_cache, feature_filename)
         else:
             log.debug("Writing features {label}".format(label=log_label))
             featurefile.dump(features, feature_file)
@@ -131,6 +136,9 @@ class ComparePockets(Task):
 
     def run(self):
         params = self.params
+        environ = dict(os.environ.items())
+        update_environ_from_namespace(environ, params)
+
         logging.basicConfig(stream=params.log)
         log = logging.getLogger('pocketfeature')
         log.setLevel(LOG_LEVELS.get(params.log_level, 'debug'))
@@ -182,12 +190,24 @@ class ComparePockets(Task):
                                        link_cached=params.link_cached,
                                        log=log,
                                        log_label='B')
+
+        log.info("Extrating pocket names")
+        pointsA = list(pointsA)
+        pointsB = list(pointsB)
+        first_pointA = pointsA[0]
+        first_pointB = pointsB[0]
+        commentTokensA = first_pointA.comment.split()[0].split('_')
+        commentTokensB = first_pointB.comment.split()[0].split('_')
+        signature_stringA = "_".join(t for i, t in enumerate(commentTokensA)
+                                                if i < 4)
+        signature_stringB = "_".join(t for i, t in enumerate(commentTokensB) 
+                                                if i < 4)
                               
         log.info("Generating FEATURE vectors")
         ffA_cache_file = None
         ffB_cache_file = None
         if params.ff_cache:
-            log.debug("Checking for cached FEATURE files in: {0}".format(params.ptf_cache))
+            log.debug("Checking for cached FEATURE files in: {0}".format(params.ff_cache))
             ffA_cache_file = params.ff_cache.format(pdbid=pdbidA)
             ffB_cache_file = params.ff_cache.format(pdbid=pdbidB)
 
@@ -196,6 +216,7 @@ class ComparePockets(Task):
                                             pdbid=pdbidA,
                                             feature_cache=ffA_cache_file,
                                             link_cached=params.link_cached,
+                                            environ=environ,
                                             log=log,
                                             log_label='A')
 
@@ -204,6 +225,7 @@ class ComparePockets(Task):
                                             pdbid=pdbidB,
                                             feature_cache=ffB_cache_file,
                                             link_cached=params.link_cached,
+                                            environ=environ,
                                             log=log,
                                             log_label='B')
     
@@ -236,17 +258,17 @@ class ComparePockets(Task):
             params.alignment.close()
             
         log.info("Alignment Score: {0}".format(total_score))
-        print("{0}\t{1}\t{2:0.5f}".format(pocketA.signature_string,
-                                          pocketB.signature_string,
+        print("{0}\t{1}\t{2:0.5f}".format(signature_stringA,
+                                          signature_stringB,
                                           total_score),
               file=params.output)
         
         log.info("Creating PyMol scripts")
-        scriptA, scriptB = create_alignment_visualizations(pocketA.points, 
-                                                 pocketB.points, 
-                                                 alignment,
-                                                 pdbA=params.pdbA.name,
-                                                 pdbB=params.pdbB.name)
+        scriptA, scriptB = create_alignment_visualizations(pointsA, 
+                                                           pointsB, 
+                                                           alignment,
+                                                           pdbA=params.pdbA.name,
+                                                           pdbB=params.pdbB.name)
 
         if params.pymolA is not None:
             log.debug("Writing first PyMol script") 

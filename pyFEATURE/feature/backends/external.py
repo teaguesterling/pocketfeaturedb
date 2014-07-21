@@ -192,6 +192,9 @@ def featurize(shells=None,
               working_dir=None,
               environ=None,
               with_errors=False,
+              feature_dir=None,
+              pdb_dir=None,
+              dssp_dir=None,
               *exec_args,
               **exec_params):
     """ A base function for running featurize
@@ -213,6 +216,12 @@ def featurize(shells=None,
         for key, value in feature_environ.iteritems():
             if key not in environ:
                 environ[key] = value
+    if feature_dir is not None:
+        environ['FEATURE_DIR'] = feature_dir
+    if pdb_dir is not None:
+        environ['PDB_DIR'] = pdb_dir
+    if dssp_dir is not None:
+        environ['DSSP_DIR'] = dssp_dir
     
     for variable in REQUIRED_ENVIRONMENT:
         if variable not in environ:
