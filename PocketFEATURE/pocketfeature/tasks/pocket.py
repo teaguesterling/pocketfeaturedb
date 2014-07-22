@@ -25,6 +25,35 @@ from pocketfeature.utils.pdb import (
 from pocketfeature.tasks.core import Task
 
 
+def focus_structure(structure, model=0, chain=None):
+    focus = structure
+    if model is not None:
+        models = structure.get_list()
+        found = [m for m in models if m.get_id() == model]
+        if len(found) == 0:
+            raise ValueError("Model {0} not found in {1}".format(model, structure))
+        elif len(found) > 1:
+            raise ValueError("Model {0} ambigous in {1}".format(model, structure))
+        else:
+            focus = found[0]
+
+        if chain is not None:
+            chains = focus.get_list()
+    elif chain is not None:
+        chains = get_chains()
+
+    if chain is not None:
+        found = [c for c in chains if c.get_id() == chain]
+        if len(found) == 0:
+            raise ValueError("Chain {0} not found in {1}".format(model, structure))
+        elif len(found) > 1:
+            raise ValueError("Chain {0} ambigous in {1}".format(model, structure))
+        else:
+            focus = found[0]
+
+    return focus
+
+
 def find_neighboring_residues(structure, queries, cutoff=6.0, 
                                                   ordered=True,
                                                   excluded=is_het_residue,
@@ -106,7 +135,18 @@ class PocketFinder(Task):
         if params.pdbid is None:
             params.pdbid, params.pdb = guess_pdbid_from_stream(params.pdb)
 
+        if params.model == -1:
+            model_id = None
+        else:
+            model_id = params.model
+        if params.chain == '-':
+            chain_id = None
+        else:
+            chain_id = params.chain
+
         structure = pdbfile.load(params.pdb, pdbid=params.pdbid)
+        structure = focus_structure(structure, model=model_id, chain=chain_id)
+
         ligand = params.ligand
         if params.list_only:
             ligands = list_ligands(structure)
@@ -159,6 +199,14 @@ class PocketFinder(Task):
                                       type=str,
                                       default=None,
                                       help='PDB ID to use for input structure [default: BEST GUESS]')
+        parser.add_argument('-m', '--model', metavar='MODEL_NUMBER',
+                                      type=int,
+                                      default=0,
+                                      help='Model index to input structure (-1 for all) [default: %(default)s]')
+        parser.add_argument('-c', '--chain', metavar='CHAIN_ID',
+                                      type=str,
+                                      default='-',
+                                      help='Chain id to input structure (- for all) [default: %(default)s]')
         parser.add_argument('-o', '--output', metavar='PTF',
                                               type=FileType.compressed('w'),
                                               default=stdout,
