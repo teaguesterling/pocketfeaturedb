@@ -54,6 +54,14 @@ compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
 
 
 @contextlib.contextmanager
+def maybe_open(path, mode='r', opener=open):
+    if path is not None:
+        yield opener(path, mode)
+    else:
+        yield None
+
+
+@contextlib.contextmanager
 def existing_file(path, mode='r', resume=False):
     if path == '-':
         if mode == 'r' and resume:
@@ -129,7 +137,7 @@ def calculate_residue_pair_normalization(key, std_dev, fileA, fileB, storeFile=N
     std = std_dev.features
     with gzip.open(fileA) as ioA, \
          gzip.open(fileB) as ioB, \
-         gzip.open(storeFile, 'w') as ioStore:
+         maybe_open(storeFile, 'w', gzip.open) as ioStore:
         stats = GaussianStats(store=ioStore)
         ffA = featurefile.load(ioA)
         ffB = featurefile.load(ioB)
@@ -519,8 +527,11 @@ class GeneratePocketFeatureBackground(Task):
         scores_map = {}
         for (typeA, typeB), (ffA, ffB) in pairs.items():
             key = backgrounds.make_vector_type_key((typeA, typeB))
-            scores_file = "{0}-{1}.scores.gz".format(*key)
-            scores_path = os.path.join(self.params.ff_dir, scores_file)
+            if self.params.all_data:
+                scores_file = "{0}-{1}.scores.gz".format(*key)
+                scores_path = os.path.join(self.params.ff_dir, scores_file)
+            else:
+                scores_path = None
             scores_map[key] = scores_path
         return scores_map
 
