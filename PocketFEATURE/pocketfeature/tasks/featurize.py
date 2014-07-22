@@ -21,15 +21,15 @@ def featurize_points(pointslist, featurize_args={}, featurefile_args={}):
 
 
 def update_environ_from_namespace(environ, namespace):
-    if namespace.feature_root is not None:
+    if hasattr(namespace, 'feature_root') and namespace.feature_root is not None:
         environ['FEATURE_ROOT'] = os.path.expanduser(namespace.feature_root)
-    if namespace.feature_dir is not None:
+    if hasattr(namespace, 'feature_dir') and namespace.feature_dir is not None:
         environ['FEATURE_DIR'] = os.path.expanduser(namespace.feature_dir)
-    if namespace.feature_bin is not None:
+    if hasattr(namespace, 'feature_bin') and namespace.feature_bin is not None:
         environ['FEATURE_BIN'] = os.path.expanduser(namespace.feature_bin)
-    if namespace.pdb_dir is not None:
+    if hasattr(namespace, 'pdb_dir') and namespace.pdb_dir is not None:
         environ['PDB_DIR'] = os.path.expanduser(namespace.pdb_dir)
-    if namespace.dssp_dir is not None:
+    if hasattr(namespace, 'dssp_dir') and namespace.dssp_dir is not None:
         environ['DSSP_DIR'] = os.path.expanduser(namespace.dssp_dir)
 
 

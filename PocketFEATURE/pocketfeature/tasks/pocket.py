@@ -112,7 +112,6 @@ def find_ligand_in_structure(structure, ligand_name, index=0):
 
 def find_one_of_ligand_in_structure(structure, ligand_names, index=0):
     ligands = list_ligands(structure)
-    print(ligands)
     for ligand in ligands:
         if residue_name(ligand) in ligand_names:
             return ligand

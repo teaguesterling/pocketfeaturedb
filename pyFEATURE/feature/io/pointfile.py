@@ -83,7 +83,7 @@ def loadi(src, wrapper=PDBPoint, ignore_invalid=False):
         try:
             line = line.strip()
             if '#' in line:
-                line, comment = map(str.strip, line.split('#'))
+                line, comment = map(str.strip, line.split('#', 1))
             if len(line) > 0:
                 pdbid, x, y, z = line.split()
                 x, y, z = map(float, (x, y, z))
