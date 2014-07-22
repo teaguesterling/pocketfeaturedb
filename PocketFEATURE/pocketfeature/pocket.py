@@ -16,6 +16,7 @@ class Pocket(object):
                                  defined_by=None,
                                  name=None,
                                  residue_centers=DEFAULT_CENTERS,
+                                 points=None,
                                  skip_partial_residues=True):
         self._pdbid = pdbid
         self._residues = residues
@@ -23,6 +24,17 @@ class Pocket(object):
         self._name = name
         self._centers = residue_centers
         self._skip_partial_residues = skip_partial_residues
+        self._points = points
+
+    @property
+    def pickelable(self):
+        return Pocket(residues=self.residues,
+                      pdbid=self.pdbid,
+                      defined_by=self.defined_by,
+                      name=self.name,
+                      points=list(self.points),   # Compute to pickle
+                      residue_centers=None,       # Mask to picel
+                      skip_partial_residues=self._skip_partial_residues)
 
     @property
     def pdbid(self):
@@ -42,12 +54,19 @@ class Pocket(object):
 
     @property
     def points(self):
-        for residue in self.residues:
-            pdbid = self._getResiduePdb(residue)
-            points = self._get_microenvironments(residue)
-            for point_type, point in points:
-                comment = self._getResidueComment(residue, point_type)
-                yield PDBPoint(*point, pdbid=pdbid, comment=comment)
+        if self._points is not None:
+            return self._points
+        elif self._centers is None:
+            raise RuntimeError("Residue centers are not defined")
+        else:
+            def _gen():
+                for residue in self.residues:
+                    pdbid = self._getResiduePdb(residue)
+                    points = self._get_microenvironments(residue)
+                    for point_type, point in points:
+                        comment = self._getResidueComment(residue, point_type)
+                        yield PDBPoint(*point, pdbid=pdbid, comment=comment)
+            return _gen()
 
     @property
     def signature(self):

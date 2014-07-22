@@ -24,8 +24,6 @@ from feature.io.locate_files import (
 
 from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity,
-    reference_cutoff_tanimoto_similarity,
-    adjusted_reference_cutoff_tanimoto_similarity,
     cutoff_modified_tanimoto_similarity,
     GaussianStats,
     unique_product,
@@ -52,6 +50,7 @@ from pocketfeature.utils.pdb import guess_pdbid_from_stream
 
 
 compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
+#compute_raw_cutoff_similarity = cosine_similarity
 
 
 @contextlib.contextmanager
@@ -83,6 +82,15 @@ def pocket_from_pdb(pdb_path, find_ligand=pick_best_ligand,
     else:
         pocket = None
     return pocket
+
+
+def _pocket_from_pdb_star(args):
+    pdb_path, args, kwargs = args
+    pocket = pocket_from_pdb(pdb_path, *args, **kwargs) 
+    if pocket is not None:
+        return pocket.pickelable
+    else:
+        return None
 
 
 def get_pdb_list(pdb_src, pdb_dir=None, log=logging, fail_on_missing=True):
@@ -117,11 +125,12 @@ def _featurize_point_stream_star(args):
     return featurize_point_stream(*args)
 
 
-def calculate_residue_pair_normalization(key, std_dev, fileA, fileB):
-    stats = GaussianStats()
+def calculate_residue_pair_normalization(key, std_dev, fileA, fileB, storeFile=None):
     std = std_dev.features
     with gzip.open(fileA) as ioA, \
-         gzip.open(fileB) as ioB:
+         gzip.open(fileB) as ioB, \
+         gzip.open(storeFile, 'w') as ioStore:
+        stats = GaussianStats(store=ioStore)
         ffA = featurefile.load(ioA)
         ffB = featurefile.load(ioB)
         if fileA == fileB:
@@ -219,7 +228,9 @@ class GeneratePocketFeatureBackground(Task):
             else:
                 log.debug("Creating directory {0}".format(params.ff_dir))
                 os.mkdir(params.ff_dir)
-                
+
+        self.point_file = os.path.join(params.ff_dir, 'points.ptf')
+
         self.bg = self.generate_vector_stats()
         self.norms = self.generate_score_stats()
 
@@ -227,14 +238,23 @@ class GeneratePocketFeatureBackground(Task):
     def generate_vector_stats(self):
         params = self.params
         log = self.log
+        point_file = os.path.join(self.params.ff_dir, 'points.ptf')
+        
         if params.resume and os.path.exists(params.background):
             with open(params.background) as f:
                 bg = backgrounds.load_stats_data(f)
         else:
-            pdbs = get_pdb_list(params.pdbs, pdb_dir=params.pdb_dir, log=self.log)
-            self._num_pdbs = len(pdbs)
-            log.info("Found {0} PDBs".format(self._num_pdbs))
-            vectors = self.get_pocket_vectors(pdbs)
+            if params.resume and os.path.exists(self.point_file):
+                log.info("Found existing pointfile at {0}".format(self.point_file))
+                with open(self.point_file) as f:
+                    points = pointfile.load(f)
+                    vectors = self.create_vectors(points)
+            else:
+                pdbs = get_pdb_list(params.pdbs, pdb_dir=params.pdb_dir, log=self.log)
+                self._num_pdbs = len(pdbs)
+                log.info("Found {0} PDBs".format(self._num_pdbs))
+                vectors = self.get_pocket_vectors(pdbs)
+
             stats, metadata, pdbs = self.process_vectors(vectors)
             bg = create_background_features_from_stats(stats,
                     NUM_SHELLS=metadata.num_shells,
@@ -252,8 +272,10 @@ class GeneratePocketFeatureBackground(Task):
         log = self.log
         std_dev = self.bg.get(backgrounds.STD_DEV_VECTOR)
         pairs, resumed = self.get_allowed_ff_pairs()
+        statsFiles = self.get_ff_pair_scores_files(pairs)
         num_pairs = len(pairs)
-        all_args = ((key, std_dev, fA, fB) for key, (fA, fB) in pairs.items())
+        all_args = ((key, std_dev, fA, fB, statsFiles[key]) 
+                           for key, (fA, fB) in pairs.items())
 
         if self.params.resume:
             num_resumed = len(resumed)
@@ -283,8 +305,8 @@ class GeneratePocketFeatureBackground(Task):
         num_processors = min(params.num_processors, num_pairs)
         if params.num_processors is not None and num_processors > 1:
             log.info("Calculating with {0} workers".format(params.num_processors))
-            pool = multiprocessing.Pool(num_processors)
-            items = pool.imap(_calculate_residue_pair_normalization_star, all_args)
+            self.pool = multiprocessing.Pool(params.num_processors)
+            items = self.pool.imap_unordered(_calculate_residue_pair_normalization_star, all_args)
         else:
             log.debug("Calculating {0} pairs serially".format(num_pairs))
             items = itertools.imap(_calculate_residue_pair_normalization_star, all_args)
@@ -311,14 +333,38 @@ class GeneratePocketFeatureBackground(Task):
 
     def get_pockets(self, pdbs):
         num_pdbs = len(pdbs)
-        for idx, pdb in enumerate(pdbs, start=1):
+        num_successful = 0
+        num_failed = 0
+        num_processors = min(min(self.params.num_processors, num_pdbs), 12)
+        kwargs = {'distance_threshold': self.params.distance}
+        all_args = [(pdb, (), kwargs) for pdb in pdbs]
+        if self.params.num_processors is not None and num_processors > 1:
+            self.log.info("Extracting pockets with with {0} workers".format(num_processors))
+            self.pool = multiprocessing.Pool(num_processors)
+            pockets = self.pool.imap_unordered(_pocket_from_pdb_star, all_args, 5)
+        else:
+            pockets = itertools.imap(_pocket_from_pdb_star, all_args)
+
+        for idx, pocket in enumerate(pockets, start=1):
+            if pocket is not None:
+                num_successful += 1
+                name = pocket.signature_string
+            else:
+                num_failed += 1
             if self.params.progress:
-                print("\r{0} of {1} PDBs processed ({2})".format(idx, num_pdbs, pdb), 
+                print("\r{0} of {1} PDBs processed ({2} successful, {3} failed) ({4})".format(
+                            idx, 
+                            num_pdbs, 
+                            num_successful,
+                            num_failed,
+                            name), 
                         end="", file=sys.stderr)
                 sys.stderr.flush()
-            pocket = pocket_from_pdb(pdb, distance_threshold=self.params.distance)
             if pocket is not None:
                 yield pocket
+
+        self.pool.close()
+            
         if self.params.progress:
             print("", file=sys.stderr)
 
@@ -334,9 +380,15 @@ class GeneratePocketFeatureBackground(Task):
             random.shuffle(pdbs)
         pockets = self.get_pockets(pdbs)
         points = self.get_points(pockets)
+        vectors = self.create_vectors(points)
+        for vector in vectors:
+            yield vector
+
+    def create_vectors(self, points):
         for vector in self.featurize_points(points):
             self._num_vectors += 1
             yield vector
+        
 
     # This is a member function as it uses lots of task parameters
     def featurize_points(self, points):
@@ -369,7 +421,6 @@ class GeneratePocketFeatureBackground(Task):
             vectors = featurize_point_stream(points, featurize_args=featurize_args)
 
         return vectors
-
             
     def process_vectors(self, vectors):
         stats = GaussianStats()
@@ -416,9 +467,8 @@ class GeneratePocketFeatureBackground(Task):
 
     def record_points(self, points):
         if self.params.all_data:
-            point_file = os.path.join(self.params.ff_dir, 'points.ptf')
-            self.log.debug("Dumping source points to {0}".format(point_file))
-            with open(point_file, 'w') as f:
+            self.log.debug("Dumping source points to {0}".format(self.point_file))
+            with open(self.point_file, 'w') as f:
                 for point in points:
                     pointfile.dump([point], f)
                     yield point
@@ -464,6 +514,15 @@ class GeneratePocketFeatureBackground(Task):
             if key in allowed_pairs and key not in finished:
                 allowed_map[key] = (pathA, pathB)  # order isn't important
         return allowed_map, finished
+
+    def get_ff_pair_scores_files(self, pairs):
+        scores_map = {}
+        for (typeA, typeB), (ffA, ffB) in pairs.items():
+            key = backgrounds.make_vector_type_key((typeA, typeB))
+            scores_file = "{0}-{1}.scores.gz".format(*key)
+            scores_path = os.path.join(self.params.ff_dir, scores_file)
+            scores_map[key] = scores_path
+        return scores_map
 
     def get_ff_file(self, vector):
         res_type = get_vector_type(vector)

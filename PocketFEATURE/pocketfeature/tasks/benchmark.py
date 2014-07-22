@@ -287,7 +287,7 @@ class BenchmarkPocketFeatureBackground(Task):
                 key, values = item
                 if values is None:
                     self.failed_scores += 1
-                    self.log.error("Failure to compare {0}".format(":".join(key)))
+                    self.log.warning("Failure to compare {0}".format(":".join(key)))
                 else:
                     self.successful_scores += 1
                     passthough = PassThroughItems([item])
@@ -346,7 +346,7 @@ class BenchmarkPocketFeatureBackground(Task):
                                               default=cls.LIGAND_RESIDUE_DISTANCE,
                                               help='Residue active site distance threshold [default: %(default)s]')
         parser.add_argument('-c', '--cutoffs', metavar='CUTOFFS',
-                                              default=[.1, .1, 0, -0.1, -0.15, -0.2, -0.25 -0.3],
+                                              default=[.1, .1, 0, -0.1, -0.15, -0.2, -0.25, -0.3],
                                               help='Alignment score thresholds [default: %(default)s]')
         parser.add_argument('-A', '--alignment-method', metavar='ALIGNMENT',
                                               default='greedy',

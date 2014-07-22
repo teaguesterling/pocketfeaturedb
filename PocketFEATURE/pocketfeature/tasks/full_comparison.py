@@ -9,6 +9,11 @@ from feature.io import (
 )
 from feature.io.common import open_compressed
 
+from pocketfeature.algorithms import (
+    cutoff_tanimoto_similarity,
+    cosine_similarity,
+)
+
 from pocketfeature.io import (
     backgrounds,
     featurefile,
@@ -35,6 +40,10 @@ from pocketfeature.utils.pdb import guess_pdbid_from_stream
 
 from pocketfeature.utils.args import LOG_LEVELS
 from pocketfeature.tasks.core import Task
+
+
+compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
+#compute_raw_cutoff_similarity = cosine_similarity
 
 
 def load_points(pdb_file,
@@ -159,6 +168,7 @@ class ComparePockets(Task):
         log.debug("Allowed residue pairs: {0}".format(params.allowed_pairs)) 
         background = backgrounds.load(stats_file=params.background,
                                       norms_file=params.normalization,
+                                      compare_function=compute_raw_cutoff_similarity,
                                       allowed_pairs=params.allowed_pairs)
 
         log.info("Loading PDBs")

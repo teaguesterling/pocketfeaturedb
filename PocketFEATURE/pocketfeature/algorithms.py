@@ -6,7 +6,12 @@ from collections import defaultdict
 from operator import itemgetter
 
 import numpy as np
+from scipy.spatial import distance
 from munkres import Munkres
+
+
+def cosine_similarity(dummy, a, b):
+    return distance.cosine(a, b)
 
 
 def reference_cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
@@ -180,8 +185,14 @@ def munkres_align(scores, shift_negative=False, maximize=False):
 class GaussianStats(object):
     """ A class for calculating simple statistics over streams of data """
 
-    def __init__(self, n=0, mean=None, m2=None, mins=None, maxes=None):
-         self.reset(n=n, mean=mean, m2=m2, mins=mins, maxes=maxes)
+    def __init__(self, n=0, mean=None, m2=None, mins=None, maxes=None, 
+                       store=None, store_formatter="{0:0.3f}\n".format):
+        self.reset(n=n, mean=mean, m2=m2, mins=mins, maxes=maxes)
+        self.store_dest = store
+        if isinstance(store_formatter, basestring):
+            self.store_formatter = store_formatter.format
+        else:
+            self.store_formatter = store_formatter
 
     def reset(self, n=0, mean=None, m2=None, mins=None, maxes=None):
         if mean is None:
@@ -215,6 +226,8 @@ class GaussianStats(object):
         self._mins = mins
         self._maxes = maxes
 
+        self.store(item)
+
         return item
 
     def merge(self, other):
@@ -235,6 +248,14 @@ class GaussianStats(object):
 
         cls = type(self)
         return cls(n=n, mean=mean, m2=m2, mins=mins, maxes=maxes)
+
+    def store(self, item):
+        if self.store_dest is not None:
+            if self.store_formatter is not None:
+                entry = self.store_formatter(item)
+            else:
+                entry = item
+            self.store_dest.write(entry)
 
     @property
     def n(self):

@@ -7,7 +7,7 @@ import numpy as np
 from pocketfeature.io import matrixvaluesfile
 from pocketfeature.algorithms import GaussianStats
 
-cutoffs = [0.1, 0, -0.15, -0.3]
+cutoffs = [0.1, 0.1, 0, -0.1, -0.15, -0.2, -0.25, -0.3]
 
 
 def make_all_plots(pos_file, cont_file):

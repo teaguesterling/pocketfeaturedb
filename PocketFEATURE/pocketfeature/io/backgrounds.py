@@ -103,25 +103,24 @@ class BackgroundEnvironment(object):
         allowed_pairs = itertools.ifilter(self.is_allowed_pair, pairs)
         return allowed_pairs
 
-    def tanimoto_similarity(self, vectorA, vectorB, zeroed=False):
+    def tanimoto_similarity(self, vectorA, vectorB):
         featuresA = vectorA.features
         featuresB = vectorB.features
         cutoffs = self._std_dev.features
-        return self._compare_fn(cutoffs, featuresA, featuresB, zeroed)
+        return self._compare_fn(cutoffs, featuresA, featuresB)
 
-    def normalized_similarity(self, vectorA, vectorB, zeroed=False):
-        _, norm = self.normalized_tanimoto_similarity(vectorA, vectorB, zeroed=zeroed)
+    def normalized_similarity(self, vectorA, vectorB):
+        _, norm = self.normalized_tanimoto_similarity(vectorA, vectorB)
         return norm
 
-    def normalized_tanimoto_similarity(self, vectorA, vectorB, zeroed=False):
+    def normalized_tanimoto_similarity(self, vectorA, vectorB):
         key = self.get_vector_pair_key(vectorA, vectorB)
         normalization_coeff = self._normalizations[key]
-        tanimoto = self.tanimoto_similarity(vectorA, vectorB, zeroed)
+        tanimoto = self.tanimoto_similarity(vectorA, vectorB)
         normalized = self._normalize_fn(tanimoto, normalization_coeff)
         return tanimoto, normalized
 
-    def compare_featurefiles(self, vectorA, vectorB, normalize=True, 
-                                                     zeroed=False):
+    def compare_featurefiles(self, vectorA, vectorB, normalize=True):
         if normalize:
             get_score = self.normalized_tanimoto_similarity
         else:
@@ -130,16 +129,15 @@ class BackgroundEnvironment(object):
         for vector1, vector2 in pairs:
             key = self.get_vector_pair_key(vector1, vector2)
             name = (vector1.name, vector2.name)
-            scores = get_score(vector1, vector2, zeroed=zeroed)
+            scores = get_score(vector1, vector2)
             yield name, scores
 
     def get_comparison_matrix(self, vectorA, vectorB, normalize=True,
-                                                      zeroed=False,
                                                       matrix_wrapper=MatrixValues):
         score_names = [RAW_SCORE]
         if normalize:
             score_names.append(NORMALIZED_SCORE)
-        scores = self.compare_featurefiles(vectorA, vectorB, normalize=normalize, zeroed=zeroed)
+        scores = self.compare_featurefiles(vectorA, vectorB, normalize=normalize)
         matrix = matrix_wrapper(scores, value_dims=score_names)
         return matrix
 
