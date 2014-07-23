@@ -188,20 +188,20 @@ def munkres_align(scores, shift_negative=False, maximize=False):
 class GaussianStats(object):
     """ A class for calculating simple statistics over streams of data """
 
-    def __init__(self, n=0, mean=None, m2=None, mins=None, maxes=None, mode_binning=None, 
-                       store=None, store_formatter="{0:0.3f}\n".format):
-        if isinstace(mode_binning, int):
+    def __init__(self, n=0, mean=None, m2=None, mins=None, maxes=None, mode_bins=None,
+                 mode_binning=None, store=None, store_formatter="{0:0.3f}\n".format):
+        if isinstance(mode_binning, int):
             self._bin_for_mode = lambda x: round(x, mode_binning)
         else:
-            self._bin_for_mode = bin_mode
+            self._bin_for_mode = mode_binning
         self._store_dest = store
-        self.reset(n=n, mean=mean, m2=m2, mins=mins, maxes=maxes)
+        self.reset(n=n, mean=mean, m2=m2, mins=mins, maxes=maxes, mode_bins=mode_bins)
         if isinstance(store_formatter, basestring):
             self._store_formatter = store_formatter.format
         else:
             self._store_formatter = store_formatter
 
-    def reset(self, n=0, mean=None, m2=None, mins=None, maxes=None):
+    def reset(self, n=0, mean=None, m2=None, mins=None, maxes=None, mode_bins=None):
         if mean is None:
             mean = np.zeros(1)
         if m2 is None:
@@ -210,16 +210,16 @@ class GaussianStats(object):
             mins = np.zeros(1)
         if maxes is None:
             maxes = np.zeros(1)
+        if self._bin_for_mode is not None:
+            if mode_bins is None:
+                mode_bins = Counter()
 
-        if self._mode_bins is not None:
-            self._mode_counts = Counter()
-        else:
-            self._mode_counts = None
         self._n = n
         self._mean = np.array(mean)
         self._m2 = np.array(m2)
         self._mins = np.array(mins)
         self._maxes = np.array(maxes)
+        self._mode_counts = mode_bins
 
     def record(self, item):
         sample = np.array(item)
@@ -274,6 +274,13 @@ class GaussianStats(object):
                 entry = item
             self._store_dest.write(entry)
 
+    def get_top_n_modes(self, n):
+        if self._mode_counts is not None:
+            modes = self._mode_counts.most_common(n)
+            if len(modes) > 0:
+                return modes
+        return None
+
     @property
     def n(self):
         return self._n
@@ -307,8 +314,17 @@ class GaussianStats(object):
 
     @property
     def mode(self):
-        if self._mode_counts is not None:
-            return self._mode_counts.most_common()
+        mode = self.get_top_n_modes(1)
+        if mode is not None:
+            return mode[0][0]
+        else:
+            return None
+
+    @property
+    def mode_count(self):
+        mode = self.get_top_n_modes(1)
+        if mode is not None:
+            return mode[0][1]
         else:
             return None
 

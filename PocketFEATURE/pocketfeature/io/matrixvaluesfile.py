@@ -175,8 +175,9 @@ def load(io, dims=2, delimiter=None,
 def dump(matrix_values, io, delimiter="\t", columns=None, tpl="{:.3f}", header=False):
     columns = set(columns) if columns is not None else None
     if header and len(matrix_values.dim_refs) > 0:
-        dims = sorted(matrix_values.dim_refs.items(), key=operator.itemgetter(1))
-        row = map(operator.itemgetter(0), dims)
+        row = ["INDEX"] * len(matrix_values.indexes())
+        dims = sorted(matrix_values.dim_refs.items(), key=operator.itemgetter(0))
+        row.extend(str(dim[1]) for dim in dims)
         print(delimiter.join(row), file=io)
     for key, values in matrix_values.iteritems():
         if matrix_values.value_dims == 1:

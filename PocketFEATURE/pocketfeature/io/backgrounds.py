@@ -155,9 +155,9 @@ class BackgroundEnvironment(object):
 
 
 def load_normalization_data(io, column=0):
-    norms = matrixvaluesfile.load(io, columns=[column], 
-                                      cast=float,
-                                      make_key=make_vector_type_key)
+    norms = matrixvaluesfile.load(io, cast=float,
+                                      make_key=make_vector_type_key,
+                                      header=True)
     return norms
 
 
@@ -174,12 +174,13 @@ def load(stats_file, norms_file, wrapper=BackgroundEnvironment,
                                  std_dev_vector=STD_DEV_VECTOR,
                                  mean_vector=MEAN_VECTOR,
                                  metadata=None,
-                                 norm_mode_column=0,
+                                 norm_column='mode',
                                  compare_function=cutoff_tanimoto_similarity,
                                  normalize_function=normalize_score,
                                  allowed_pairs=None):
     stats_ff = load_stats_data(stats_file, metadata)
-    coeffs = load_normalization_data(norms_file, column=norm_mode_column)
+    stats_bgs = load_normalization_data(norms_file)
+    coeffs = stats_bgs.slice_values(norm_column)
 
     metadata = stats_ff.metadata
     if has_vector(stats_ff.vectors, std_dev_vector):
