@@ -328,7 +328,7 @@ class GeneratePocketFeatureBackground(Task):
         if params.progress:
             items = display_progress(items)
 
-        values_out = PassThroughItems(items, dim_refs=dict(enumerate(BG_COEFFS_COLUMNS))
+        values_out = PassThroughItems(items, dim_refs=dict(enumerate(BG_COEFFS_COLUMNS)))
         log.debug("Writing Background normalization coefficients to {0}".format(params.normalization))
   
         with open(params.normalization, write_mode) as f:
@@ -435,7 +435,7 @@ class GeneratePocketFeatureBackground(Task):
         return vectors
             
     def process_vectors(self, vectors):
-        stats = GaussianStats()
+        stats = GaussianStats(mode_binning=None)
         pdbs = set()
         metadata = None
         for idx, vector in enumerate(vectors, start=1):

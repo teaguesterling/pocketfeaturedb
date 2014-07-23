@@ -40,7 +40,7 @@ def focus_structure(structure, model=0, chain=None):
         if chain is not None:
             chains = focus.get_list()
     elif chain is not None:
-        chains = get_chains()
+        chains = focus.get_chains()
 
     if chain is not None:
         found = [c for c in chains if c.get_id() == chain]
@@ -50,7 +50,6 @@ def focus_structure(structure, model=0, chain=None):
             raise ValueError("Chain {0} ambigous in {1}".format(model, structure))
         else:
             focus = found[0]
-
     return focus
 
 
@@ -91,7 +90,8 @@ def create_pocket_around_ligand(structure, ligand, cutoff=6.0,
                                                             ordered=True, 
                                                             excluded=is_het_residue, 
                                                             residue_centers=residue_centers)
-    pocket = Pocket(residues, pdbid=structure.get_id(),
+    pdbid = structure.get_full_id()[0]
+    pocket = Pocket(residues, pdbid=pdbid,
                               defined_by=ligand,
                               name=name,
                               residue_centers=residue_centers)

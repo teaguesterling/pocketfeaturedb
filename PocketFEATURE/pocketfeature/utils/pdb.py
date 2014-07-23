@@ -14,7 +14,7 @@ from Bio.PDB.Polypeptide import (
 residue_code_one_to_three = one_to_three
 residue_code_three_to_one = three_to_one
 
-
+MIN_ATOMS_IN_LIGAND = 2
 IGNORED_LIGANDS = set((
     'W',
     'H_SO4',
@@ -114,6 +114,7 @@ def is_water(residue):
 def is_ligand_residue(residue):
     het, seq, ins = residue.get_id()
     return het.startswith("H_") \
+       and len(residue) > MIN_ATOMS_IN_LIGAND \
        and het not in IGNORED_LIGANDS
 
 

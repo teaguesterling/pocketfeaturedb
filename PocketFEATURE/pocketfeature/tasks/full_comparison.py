@@ -25,6 +25,7 @@ from pocketfeature.io.backgrounds import NORMALIZED_SCORE
 from pocketfeature.tasks.pocket import (
     create_pocket_around_ligand,
     find_one_of_ligand_in_structure,
+    focus_structure,
     pick_best_ligand,
 )
 from pocketfeature.tasks.align import (
@@ -122,7 +123,6 @@ def generate_featurefile(points,
         with open_compressed(feature_cache) as f:
             features = featurefile.load(f)
     else:
-             
         log.debug("FEATURIZING Pocket {label}".format(label=log_label))
         features = featurize_points(points, 
                                     featurize_args={
