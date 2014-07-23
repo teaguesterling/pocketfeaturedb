@@ -2,7 +2,10 @@
 
 from __future__ import division
 
-from collections import defaultdict
+from collections import (
+    defaultdict,
+    Counter,
+)
 from operator import itemgetter
 
 import numpy as np
@@ -185,14 +188,18 @@ def munkres_align(scores, shift_negative=False, maximize=False):
 class GaussianStats(object):
     """ A class for calculating simple statistics over streams of data """
 
-    def __init__(self, n=0, mean=None, m2=None, mins=None, maxes=None, 
+    def __init__(self, n=0, mean=None, m2=None, mins=None, maxes=None, mode_binning=None, 
                        store=None, store_formatter="{0:0.3f}\n".format):
-        self.reset(n=n, mean=mean, m2=m2, mins=mins, maxes=maxes)
-        self.store_dest = store
-        if isinstance(store_formatter, basestring):
-            self.store_formatter = store_formatter.format
+        if isinstace(mode_binning, int):
+            self._bin_for_mode = lambda x: round(x, mode_binning)
         else:
-            self.store_formatter = store_formatter
+            self._bin_for_mode = bin_mode
+        self._store_dest = store
+        self.reset(n=n, mean=mean, m2=m2, mins=mins, maxes=maxes)
+        if isinstance(store_formatter, basestring):
+            self._store_formatter = store_formatter.format
+        else:
+            self._store_formatter = store_formatter
 
     def reset(self, n=0, mean=None, m2=None, mins=None, maxes=None):
         if mean is None:
@@ -204,6 +211,10 @@ class GaussianStats(object):
         if maxes is None:
             maxes = np.zeros(1)
 
+        if self._mode_bins is not None:
+            self._mode_counts = Counter()
+        else:
+            self._mode_counts = None
         self._n = n
         self._mean = np.array(mean)
         self._m2 = np.array(m2)
@@ -219,6 +230,10 @@ class GaussianStats(object):
         m2 = self._m2 + delta * (sample - mean)
         mins = np.minimum(self._mins, sample)
         maxes = np.maximum(self._maxes, sample)
+
+        if self._mode_counts is not None:
+            bin = self._bin_for_mode(item)
+            self._mode_counts[bin] += 1
 
         self._n = n
         self._mean = mean
@@ -246,16 +261,18 @@ class GaussianStats(object):
         mins = np.minimum(self.mins, other.mins)
         maxes = np.maximum(self.maxes, other.maxes)
 
+        #TODO: Add mode merging
+
         cls = type(self)
         return cls(n=n, mean=mean, m2=m2, mins=mins, maxes=maxes)
 
     def store(self, item):
-        if self.store_dest is not None:
-            if self.store_formatter is not None:
-                entry = self.store_formatter(item)
+        if self._store_dest is not None:
+            if self._store_formatter is not None:
+                entry = self._store_formatter(item)
             else:
                 entry = item
-            self.store_dest.write(entry)
+            self._store_dest.write(entry)
 
     @property
     def n(self):
@@ -287,6 +304,13 @@ class GaussianStats(object):
     @property
     def pop_std_dev(self):
         return np.sqrt(self.pop_variance)
+
+    @property
+    def mode(self):
+        if self._mode_counts is not None:
+            return self._mode_counts.most_common()
+        else:
+            return None
 
     @property
     def mins(self):
