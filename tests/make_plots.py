@@ -4,6 +4,8 @@ import sys
 from pylab import *
 import numpy as np
 
+from sklearn.metrics import roc_auc_score
+
 from pocketfeature.io import matrixvaluesfile
 from pocketfeature.algorithms import GaussianStats
 
@@ -26,6 +28,17 @@ def make_all_plots(pos_file, cont_file):
         cont_scores = all_cont_scores[i]
 
         make_plot(pos_scores, cont_scores, cutoff)
+        auc = compute_auc(pos_scores, cont_scores)
+        print("{0:01.2f}\t{1:01.3f}".format(cutoff, auc))
+
+
+def compute_auc(pos_scores, cont_scores):
+    pos_labels = np.zeros(pos_scores.shape)
+    cont_labels = np.ones(cont_scores.shape)
+    scores = np.concatenate((pos_scores, cont_scores))
+    labels = np.concatenate((pos_labels, cont_labels))
+
+    return roc_auc_score(labels, scores)
 
 
 def make_plot(pos_scores, cont_scores, cutoff, steps=50):

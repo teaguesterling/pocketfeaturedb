@@ -71,6 +71,10 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
         job_files['dssp_dir'] = params['dssp_dir']
 
     task = ComparePockets.from_params(
+        modelA=None,
+        modelB=None,
+        chainA=None,
+        chainB=None,
         ligandA=params['ligandA'],  # Extract positive ligands if specified
         ligandB=params['ligandB'], 
         cutoff=top_cutoff,
@@ -95,7 +99,7 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
         align_path = os.path.join(comp_dir, token + '_{0}.align'.format(cutoff))
         job_files = {
             'scores': open(os.path.join(comp_dir, token + ".scores")),
-            'log': open(os.path.join(comp_dir, token + ".log"), 'w'),
+            'log': open(os.path.join(comp_dir, token + ".log"), 'a'),
             'output': open(align_path, 'w'),
         }
 
@@ -165,7 +169,7 @@ class BenchmarkPocketFeatureBackground(Task):
 
         if os.path.exists(params.bench_dir):
             if params.resume:
-                log.warn("Resuming with feature vectors from BENCH_DIR")
+                log.waringn("Resuming with feature vectors from BENCH_DIR")
             else:
                 log.warning("BENCH_DIR is not empty and NOT resuming. Erasing benchmark files")
                 shutil.rmtree(params.bench_dir)
@@ -260,7 +264,8 @@ class BenchmarkPocketFeatureBackground(Task):
     def compare_positives(self):
         positives = get_pdb_list(self.params.positives, pdb_dir=self.params.pdb_dir,
                                                         log=self.log)
-        pairs = itertools.combinations(positives, 2)
+#        pairs = itertools.combinations(positives, 2)
+        pairs = itertools.combinations_with_replacement(positives, 2)
         output = self.params.positives_out
         scores, stats = self.compare_pdb_pairs(pairs, 'positives', output,
                                                ligA=self.params.positive_ligands,
@@ -287,7 +292,7 @@ class BenchmarkPocketFeatureBackground(Task):
                 key, values = item
                 if values is None:
                     self.failed_scores += 1
-                    self.log.warning("Failure to compare {0}".format(":".join(key)))
+                    self.log.debug("Failure to compare {0}".format(":".join(key)))
                 else:
                     self.successful_scores += 1
                     passthough = PassThroughItems([item])

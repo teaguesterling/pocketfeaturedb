@@ -153,11 +153,14 @@ def greedy_align(scores, maximize=False):
     """
     # Takes a MatrixValue object instead of an array for now
     accepted = []
-    chosen_keys = set()
+    chosen_keys = defaultdict(set)
     ordered_items = sorted(scores.items(), key=itemgetter(1), reverse=maximize)
     for keys, value in ordered_items:
-        if not any(key in chosen_keys for key in keys):
-            chosen_keys.update(keys)
+	# Make sure we only check that a key has been chosen from a given item
+	indexed_keys = list(enumerate(keys))
+        if all(key not in chosen_keys[idx] for idx, key in indexed_keys):
+            for idx, key in indexed_keys:
+                chosen_keys[idx].add(key)
             accepted.append((keys, value))
     return accepted
 

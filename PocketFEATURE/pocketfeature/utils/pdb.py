@@ -114,7 +114,7 @@ def is_water(residue):
 def is_ligand_residue(residue):
     het, seq, ins = residue.get_id()
     return het.startswith("H_") \
-       and len(residue) > MIN_ATOMS_IN_LIGAND \
+       and len(residue) >= MIN_ATOMS_IN_LIGAND \
        and het not in IGNORED_LIGANDS
 
 

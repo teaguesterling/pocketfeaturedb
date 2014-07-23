@@ -30,6 +30,9 @@
 #
 #
 
+if [ ! -z $1 ]; then
+	ALIGN="--alignment $1"
+fi
 
 echo "Cleaning up old versions"
 pip uninstall pyFEATURE PocketFEATURE
@@ -66,7 +69,8 @@ run_pf data/1qhx.pdb data/1qrd.pdb \
        -b data/background.ff \
        -n data/background.coeffs \
        --pymolA=/tmp/1qhx.py \
-       --pymolB=/tmp/1qrd.py
+       --pymolB=/tmp/1qrd.py \
+       $ALIGN
 
 echo "Attempting to visualize"
 if [ $( which pymol ) ]; then

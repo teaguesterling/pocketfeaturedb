@@ -123,7 +123,8 @@ class MatrixValues(OrderedDict):
 
 
 class PassThroughItems(object):
-    def __init__(self, entries=[], indexes=None, value_dims=None, dim_refs={}):
+    def __init__(self, entries=[], indexes=[], dims=2, value_dims=[], dim_refs={}):       
+        self.dims = dims
         self.indexes = indexes
         self.value_dims = value_dims
         self.dim_refs = dim_refs
@@ -175,7 +176,7 @@ def load(io, dims=2, delimiter=None,
 def dump(matrix_values, io, delimiter="\t", columns=None, tpl="{:.3f}", header=False):
     columns = set(columns) if columns is not None else None
     if header and len(matrix_values.dim_refs) > 0:
-        row = ["INDEX"] * len(matrix_values.indexes())
+        row = ["INDEX"] * matrix_values.dims
         dims = sorted(matrix_values.dim_refs.items(), key=operator.itemgetter(0))
         row.extend(str(dim[1]) for dim in dims)
         print(delimiter.join(row), file=io)

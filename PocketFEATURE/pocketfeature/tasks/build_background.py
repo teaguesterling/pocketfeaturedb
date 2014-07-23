@@ -25,6 +25,7 @@ from feature.io.locate_files import (
 from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity,
     cutoff_modified_tanimoto_similarity,
+    cosine_similarity,
     GaussianStats,
     unique_product,
 )
@@ -54,6 +55,7 @@ BG_COEFFS_COLUMNS = ('mode', 'mean', 'std_dev', 'n', 'min', 'max')
 
 compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
 #compute_raw_cutoff_similarity = cosine_similarity
+#compute_raw_cutoff_similarity = cutoff_modified_tanimoto_similarity
 
 
 @contextlib.contextmanager
@@ -328,7 +330,7 @@ class GeneratePocketFeatureBackground(Task):
         if params.progress:
             items = display_progress(items)
 
-        values_out = PassThroughItems(items, dim_refs=dict(enumerate(BG_COEFFS_COLUMNS)))
+        values_out = PassThroughItems(items, dims=2, dim_refs=dict(enumerate(BG_COEFFS_COLUMNS)))
         log.debug("Writing Background normalization coefficients to {0}".format(params.normalization))
   
         with open(params.normalization, write_mode) as f:
