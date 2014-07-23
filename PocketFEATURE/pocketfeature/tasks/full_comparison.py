@@ -49,6 +49,8 @@ compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
 def load_points(pdb_file,
                 points_file,
                 pdbid=None,
+                modelid=None,
+                chainid=None,
                 ligands=None,
                 distance_cutoff=6.0,
                 point_cache=None,
@@ -65,6 +67,7 @@ def load_points(pdb_file,
     else:
         log.debug("Loading structure {label}".format(label=log_label))
         structure = pdbfile.load(pdb_file, pdbid=pdbid)
+        structure = focus_structure(structure, model=modelid, chain=chainid)
 
         log.info("Finding ligands in structure {label}".format(label=log_label))
         if ligands is None:
@@ -195,6 +198,8 @@ class ComparePockets(Task):
 
         pointsA, ligandA = load_points(pdb_file=pdbA,
                                        pdbid=pdbidA,
+                                       modelid=params.modelA,
+                                       chainid=params.chainA,
                                        points_file=params.ptfA,
                                        ligands=ligandA,
                                        distance_cutoff=params.distance,
@@ -205,6 +210,8 @@ class ComparePockets(Task):
 
         pointsB, ligandB = load_points(pdb_file=pdbB,
                                        pdbid=pdbidB,
+                                       modelid=params.modelB,
+                                       chainid=params.chainB,
                                        points_file=params.ptfB,
                                        ligands=ligandB,
                                        distance_cutoff=params.distance,
@@ -329,6 +336,26 @@ class ComparePockets(Task):
         parser.add_argument('pdbB', metavar='PDBB', 
                                     type=ProteinFileType.compressed('r'),
                                     help='Path to second PDB file')
+        parser.add_argument('--modelA', metavar='MODELID',
+                                         type=int,
+                                         nargs='?',
+                                         default=0,
+                                         help='PDB Model to use from PDB A [default: <first>]')
+        parser.add_argument('--modelB', metavar='MODELID',
+                                         type=str,
+                                         nargs='?',
+                                         default=0,
+                                         help='PDB Model to use from PDB B [default: <first>]')
+        parser.add_argument('--chainA', metavar='CHAINID',
+                                         type=int,
+                                         nargs='?',
+                                         default=None,
+                                         help='Chain to restrict pocket to from PDB A [default: <any>]')
+        parser.add_argument('--chainB', metavar='CHAINID',
+                                         type=str,
+                                         nargs='?',
+                                         default=None,
+                                         help='Chain to restrict pocket to from PDB B [default: <any>]')
         parser.add_argument('--ligandA', metavar='LIGA',
                                          type=str,
                                          nargs='?',
