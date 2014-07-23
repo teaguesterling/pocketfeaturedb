@@ -48,6 +48,9 @@ from pocketfeature.utils.args import LOG_LEVELS
 from pocketfeature.utils.ff import get_vector_type
 from pocketfeature.utils.pdb import guess_pdbid_from_stream
 
+NUM_DIGITS_FOR_MODE = 3
+BG_COEFFS_COLUMNS = ('mode', 'mean', 'std_dev', 'n', 'min', 'max')
+
 
 compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
 #compute_raw_cutoff_similarity = cosine_similarity
@@ -138,7 +141,7 @@ def calculate_residue_pair_normalization(key, std_dev, fileA, fileB, storeFile=N
     with gzip.open(fileA) as ioA, \
          gzip.open(fileB) as ioB, \
          maybe_open(storeFile, 'w', gzip.open) as ioStore:
-        stats = GaussianStats(store=ioStore)
+        stats = GaussianStats(store=ioStore, mode_binning=NUM_DIGITS_FOR_MODE)
         ffA = featurefile.load(ioA)
         ffB = featurefile.load(ioB)
         if fileA == fileB:
@@ -153,13 +156,14 @@ def calculate_residue_pair_normalization(key, std_dev, fileA, fileB, storeFile=N
             raw_score = compute_raw_cutoff_similarity(std, a, b)
             stats.record(raw_score)
 
-    mode = mean = float(stats.mean)  # Mean == Mode for Gaussian
+    mode = float(stats.mode)
+    mean = float(stats.mean)
     std = float(stats.std_dev)
     n = int(stats.n)
     low = float(stats.mins)
     high = float(stats.maxes)
     
-    return key, (mode, std, n, low, high)
+    return key, (mode, mean, std, n, low, high)
 
 
 def _calculate_residue_pair_normalization_star(args):
@@ -296,7 +300,7 @@ class GeneratePocketFeatureBackground(Task):
         if num_pairs == 0:
             log.info("All residue pairs previously completed. Nothing to compute")
             with open(params.normalization) as f:
-                values = matrixvaluesfile.load(f, value_dims=('mode', 'std_dev'))
+                values = matrixvaluesfile.load(f, value_dims=BG_COEFFS_COLUMNS)
             return values
 
         def display_progress(items):
@@ -324,18 +328,18 @@ class GeneratePocketFeatureBackground(Task):
         if params.progress:
             items = display_progress(items)
 
-        values_out = PassThroughItems(items)
+        values_out = PassThroughItems(items, dim_refs=dict(enumerate(BG_COEFFS_COLUMNS))
         log.debug("Writing Background normalization coefficients to {0}".format(params.normalization))
   
         with open(params.normalization, write_mode) as f:
-            matrixvaluesfile.dump(values_out, f)
+            matrixvaluesfile.dump(values_out, f, header=True)
 
         # If resuming re-read all values
         if self.params.resume:
             with open(params.normalization) as f:
-                values = matrixvaluesfile.load(f, value_dims=('mode', 'std_dev'))
+                values = matrixvaluesfile.load(f, value_dims=BG_COEFFS_COLUMNS, header=True)
         else:
-            values = MatrixValues(local_items, value_dims=('mode', 'std_dev'))
+            values = MatrixValues(local_items, value_dims=BG_COEFFS_COLUMNS)
 
         return values
 

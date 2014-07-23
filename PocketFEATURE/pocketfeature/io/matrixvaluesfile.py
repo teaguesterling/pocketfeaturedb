@@ -3,6 +3,7 @@ from __future__ import print_function
 
 from collections import OrderedDict
 from cStringIO import StringIO
+import operator
 
 import numpy as np
 
@@ -122,9 +123,10 @@ class MatrixValues(OrderedDict):
 
 
 class PassThroughItems(object):
-    def __init__(self, entries=[], indexes=None, value_dims=None):
+    def __init__(self, entries=[], indexes=None, value_dims=None, dim_refs={}):
         self.indexes = indexes
         self.value_dims = value_dims
+        self.dim_refs = dim_refs
         self.entries = entries
 
     def items(self):
@@ -134,9 +136,20 @@ class PassThroughItems(object):
         return self.entries
 
 
-def load(io, dims=2, delimiter=None, columns=None, cast=None, make_key=tuple, value_dims=None):
+def load(io, dims=2, delimiter=None, 
+                     columns=None, 
+                     cast=None, 
+                     make_key=tuple, 
+                     value_dims=None, 
+                     header=False):
     positions = []
     indexes = [Indexer() for i in range(dims)]
+    if header:
+        column_names = next(io).split(delimiter)[dims:]
+        if columns is not None:
+            columns = [column_names.index(name) if isinstance(column, basestring) else column for column in columns]
+    else:
+        column_names = None
     columns = list(columns) if columns is not None else None
     cast = cast if cast is not None else lambda x: x
     value_count = 0
@@ -151,14 +164,20 @@ def load(io, dims=2, delimiter=None, columns=None, cast=None, make_key=tuple, va
 
     if value_dims is not None:
         value_dims = value_dims  # TODO: Clip and test
+    elif column_names is not None:
+        value_dims = column_names
     else:
         value_dims = value_count
 
     return MatrixValues(positions, indexes, value_dims=value_dims)
 
 
-def dump(matrix_values, io, delimiter="\t", columns=None, tpl="{:.3f}"):
+def dump(matrix_values, io, delimiter="\t", columns=None, tpl="{:.3f}", header=False):
     columns = set(columns) if columns is not None else None
+    if header and len(matrix_values.dim_refs) > 0:
+        dims = sorted(matrix_values.dim_refs.items(), key=operator.itemgetter(1))
+        row = map(operator.itemgetter(0), dims)
+        print(delimiter.join(row), file=io)
     for key, values in matrix_values.iteritems():
         if matrix_values.value_dims == 1:
             values = (values,)
