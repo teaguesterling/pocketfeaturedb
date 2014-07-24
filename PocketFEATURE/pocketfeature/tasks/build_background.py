@@ -55,7 +55,7 @@ BG_COEFFS_COLUMNS = ('mode', 'mean', 'std_dev', 'n', 'min', 'max')
 
 compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
 #compute_raw_cutoff_similarity = cosine_similarity
-#compute_raw_cutoff_similarity = cutoff_modified_tanimoto_similarity
+compute_raw_cutoff_similarity = cutoff_modified_tanimoto_similarity
 
 
 @contextlib.contextmanager

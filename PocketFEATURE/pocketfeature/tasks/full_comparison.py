@@ -46,7 +46,7 @@ from pocketfeature.tasks.core import Task
 
 compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
 #compute_raw_cutoff_similarity = cosine_similarity
-#compute_raw_cutoff_similarity = cutoff_modified_tanimoto_similarity
+compute_raw_cutoff_similarity = cutoff_modified_tanimoto_similarity
 
 
 def load_points(pdb_file,
