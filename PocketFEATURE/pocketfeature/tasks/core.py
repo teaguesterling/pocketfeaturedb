@@ -1,7 +1,40 @@
 from __future__ import print_function
 
 import os
+import struct
 import sys
+import time
+
+
+class Namespace(object):
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def __repr__(self):
+        vals = ', '.join("{0}={1}".format(k, repr(v)) for k, v in self.__dict__.items())
+        return "{0}({1})".format(type(self), vals)
+
+
+# TODO: Move to util module
+def ensure_all_imap_unordered_results_finish(result, expected=None, wait=0.5):
+    just_started = True
+    while True:
+        try:
+            yield next(result)
+            just_started = False
+        except StopIteration:
+            if result._length is None \
+              or (expected is not None and result._index < expected):
+                time.sleep(wait)
+            else:
+                raise
+        except IndexError:
+            if not just_started:
+                raise
+        except struct.error:
+            if not just_started:
+                raise
 
 
 class Task(object):
@@ -25,8 +58,7 @@ class Task(object):
 
     @classmethod
     def from_params(cls, **kwargs):
-        klass = type('namespace', (object,), kwargs)
-        namespace = klass()
+        namespace = Namespace(**kwargs)
         task = cls.from_namespace(namespace)
         return task
 

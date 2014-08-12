@@ -66,7 +66,8 @@ class BackgroundEnvironment(object):
                                 make_type_key=make_vector_type_key,
                                 compare_function=cutoff_tanimoto_similarity,
                                 normalize_function=normalize_score,
-                                allowed_pairs=None):
+                                allowed_pairs=None,
+                                std_threshold=1.0):
         self._std_dev = std_dev
         self._mean = mean
         self._normalizations = normalizations
@@ -78,7 +79,9 @@ class BackgroundEnvironment(object):
         if isinstance(allowed_pairs, basestring):
             allowed_pairs = ALLOWED_VECTOR_TYPE_PAIRS[allowed_pairs]
         self._allowed_pairs = allowed_pairs
-    
+        self._std_threshold_scale = std_threshold
+        self._thresholds = None
+
     def zero_features(self, features):
         if self._mean is not None:
             return features - self._mean
@@ -106,7 +109,7 @@ class BackgroundEnvironment(object):
     def tanimoto_similarity(self, vectorA, vectorB):
         featuresA = vectorA.features
         featuresB = vectorB.features
-        cutoffs = self._std_dev.features
+        cutoffs = self.thresholds
         return self._compare_fn(cutoffs, featuresA, featuresB)
 
     def normalized_similarity(self, vectorA, vectorB):
@@ -140,6 +143,13 @@ class BackgroundEnvironment(object):
         scores = self.compare_featurefiles(vectorA, vectorB, normalize=normalize)
         matrix = matrix_wrapper(scores, value_dims=score_names)
         return matrix
+
+    @property
+    def thresholds(self):
+        if self._thresholds is None:
+            std_dev = self._std_dev.features
+            self._thresholds = std_dev * self._std_threshold_scale
+        return self._thresholds
 
     @property
     def standard_deviations(self):
@@ -177,7 +187,8 @@ def load(stats_file, norms_file, wrapper=BackgroundEnvironment,
                                  norm_column='mode',
                                  compare_function=cutoff_tanimoto_similarity,
                                  normalize_function=normalize_score,
-                                 allowed_pairs=None):
+                                 allowed_pairs=None,
+                                 std_threshold=1.0):
     stats_ff = load_stats_data(stats_file, metadata)
     stats_bgs = load_normalization_data(norms_file)
     coeffs = stats_bgs.slice_values(norm_column)
@@ -200,5 +211,6 @@ def load(stats_file, norms_file, wrapper=BackgroundEnvironment,
                          make_type_key=make_type_key,
                          compare_function=compare_function,
                          normalize_function=normalize_function,
-                         allowed_pairs=allowed_pairs)
+                         allowed_pairs=allowed_pairs,
+                         std_threshold=std_threshold)
     return background

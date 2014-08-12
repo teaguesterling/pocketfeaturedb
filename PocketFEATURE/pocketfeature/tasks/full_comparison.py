@@ -174,7 +174,8 @@ class ComparePockets(Task):
         background = backgrounds.load(stats_file=params.background,
                                       norms_file=params.normalization,
                                       compare_function=compute_raw_cutoff_similarity,
-                                      allowed_pairs=params.allowed_pairs)
+                                      allowed_pairs=params.allowed_pairs,
+                                      std_threshold=params.std_threshold)
 
         log.info("Loading PDBs")
         log.debug("Extracting PDBIDs")
@@ -380,6 +381,10 @@ class ComparePockets(Task):
                                       choices=backgrounds.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
                                       default='classes',
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
+        parser.add_argument('-t', '--std-threshold', metavar='NSTD',
+                                     type=float,
+                                     default=1.0,
+                                     help="Number of standard deviations between to features to allow as 'similar'")
         parser.add_argument('-d', '--distance', metavar='DISTANCE',
                                               type=float,
                                               default=cls.LIGAND_RESIDUE_DISTANCE,

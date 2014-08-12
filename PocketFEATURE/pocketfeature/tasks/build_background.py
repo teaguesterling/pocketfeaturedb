@@ -40,7 +40,11 @@ from pocketfeature.io.matrixvaluesfile import (
     PassThroughItems,
 )
 from pocketfeature.residues import DEFAULT_CENTERS
-from pocketfeature.tasks.core import Task
+from pocketfeature.tasks.core import (
+    Task,
+    ensure_all_imap_unordered_results_finish,
+)   
+
 from pocketfeature.tasks.pocket import (
     pick_best_ligand,
     create_pocket_around_ligand,
@@ -54,7 +58,6 @@ BG_COEFFS_COLUMNS = ('mode', 'mean', 'std_dev', 'n', 'min', 'max')
 
 
 compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
-#compute_raw_cutoff_similarity = cosine_similarity
 compute_raw_cutoff_similarity = cutoff_modified_tanimoto_similarity
 
 
@@ -138,8 +141,7 @@ def _featurize_point_stream_star(args):
     return featurize_point_stream(*args)
 
 
-def calculate_residue_pair_normalization(key, std_dev, fileA, fileB, storeFile=None):
-    std = std_dev.features
+def calculate_residue_pair_normalization(key, thresholds, fileA, fileB, storeFile=None):
     with gzip.open(fileA) as ioA, \
          gzip.open(fileB) as ioB, \
          maybe_open(storeFile, 'w', gzip.open) as ioStore:
@@ -155,7 +157,7 @@ def calculate_residue_pair_normalization(key, std_dev, fileA, fileB, storeFile=N
         for vectorA, vectorB in pairs:
             a = vectorA.features
             b = vectorB.features
-            raw_score = compute_raw_cutoff_similarity(std, a, b)
+            raw_score = compute_raw_cutoff_similarity(thresholds, a, b)
             stats.record(raw_score)
 
     mode = float(stats.mode)
@@ -252,6 +254,7 @@ class GeneratePocketFeatureBackground(Task):
     def generate_vector_stats(self):
         params = self.params
         log = self.log
+        threshold = params.std_threshold
         point_file = os.path.join(self.params.ff_dir, 'points.ptf')
         
         if params.resume and os.path.exists(params.background):
@@ -274,7 +277,9 @@ class GeneratePocketFeatureBackground(Task):
                     NUM_SHELLS=metadata.num_shells,
                     SHELL_WIDTH=metadata.shell_width,
                     PROPERTIES=metadata.properties,
-                    PDBID_LIST=pdbs)
+                    PDBID_LIST=pdbs,
+                    SIMILARITY_STD_THRESHOLD=threshold)  # Threshold should be part of coeffs
+                                                         # Need to add metadata to coeefs first
             log.info("Extracted {0} vectors".format(stats.n))
             log.debug("Writing Background stats to {0}".format(params.background))
             with open(params.background, 'w') as f:
@@ -283,12 +288,16 @@ class GeneratePocketFeatureBackground(Task):
     
     def generate_score_stats(self):
         params = self.params
+        threshold = params.std_threshold
         log = self.log
+
         std_dev = self.bg.get(backgrounds.STD_DEV_VECTOR)
+        thresholds = threshold * std_dev.features
+
         pairs, resumed = self.get_allowed_ff_pairs()
         statsFiles = self.get_ff_pair_scores_files(pairs)
         num_pairs = len(pairs)
-        all_args = ((key, std_dev, fA, fB, statsFiles[key]) 
+        all_args = ((key, thresholds, fA, fB, statsFiles[key]) 
                            for key, (fA, fB) in pairs.items())
 
         if self.params.resume:
@@ -320,7 +329,8 @@ class GeneratePocketFeatureBackground(Task):
         if params.num_processors is not None and num_processors > 1:
             log.info("Calculating with {0} workers".format(params.num_processors))
             self.pool = multiprocessing.Pool(params.num_processors)
-            items = self.pool.imap_unordered(_calculate_residue_pair_normalization_star, all_args)
+            raw_items = self.pool.imap_unordered(_calculate_residue_pair_normalization_star, all_args)
+            items = ensure_all_imap_unordered_results_finish(raw_items, expected=num_pairs)
         else:
             log.debug("Calculating {0} pairs serially".format(num_pairs))
             items = itertools.imap(_calculate_residue_pair_normalization_star, all_args)
@@ -349,13 +359,15 @@ class GeneratePocketFeatureBackground(Task):
         num_pdbs = len(pdbs)
         num_successful = 0
         num_failed = 0
-        num_processors = min(min(self.params.num_processors, num_pdbs), 12)
+        #num_processors = min(min(self.params.num_processors, num_pdbs), 12)
+        num_processors = min(self.params.num_processors, num_pdbs)
         kwargs = {'distance_threshold': self.params.distance}
         all_args = [(pdb, (), kwargs) for pdb in pdbs]
         if self.params.num_processors is not None and num_processors > 1:
             self.log.info("Extracting pockets with with {0} workers".format(num_processors))
             self.pool = multiprocessing.Pool(num_processors)
-            pockets = self.pool.imap_unordered(_pocket_from_pdb_star, all_args, 5)
+            raw_pockets = self.pool.imap_unordered(_pocket_from_pdb_star, all_args, 5)
+            pockets = ensure_all_imap_unordered_results_finish(raw_pockets)
         else:
             pockets = itertools.imap(_pocket_from_pdb_star, all_args)
 
@@ -604,6 +616,10 @@ class GeneratePocketFeatureBackground(Task):
                                       choices=backgrounds.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
                                       default='classes',
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
+        parser.add_argument('-t', '--std-threshold', metavar='NSTD',
+                                     type=float,
+                                     default=1.0,
+                                     help="Number of standard deviations between to features to allow as 'similar'")
         parser.add_argument('-r', '--resume', action='store_true',
                                               default=False,
                                               help='Resume with existing files if possible [default: %(default)s]')

@@ -47,18 +47,29 @@ fi
 echo "Checking for FEATURE"
 if [ ! $( which featurize ) ]; then
     echo "Warning: featurize not found in PATH. Likely to fail"
-    echo "Press any key to continue..."
+    echo "Press Enter to continue..."
+    read
+fi
+
+echo "Checking FEATURE environment"
+if [ -z $FEATURE_DIR ]; then
+    echo "Warning: FEATURE_DIR not set. PocketFEATURE will try to guess"
+    echo "Note: This can also be solved by calling PocketFEATURE programs"
+    echo "      with the --feature-dir argument"
+    echo "Press Enter to continue..."
     read
 fi
     
 
 echo "INSTALLING pyFEATURE"
 cd pyFEATURE
+rm -vrf *.egg-info
 python setup.py install
 cd ../
 
 echo "INSTALLING PocketFEATURE"
 cd PocketFEATURE
+rm -vrf *.egg-info
 python setup.py install
 cd ../
 
@@ -70,6 +81,8 @@ run_pf data/1qhx.pdb data/1qrd.pdb \
        -n data/background.coeffs \
        --pymolA=/tmp/1qhx.py \
        --pymolB=/tmp/1qrd.py \
+       --pdb-dir=data \
+       --dssp-dir=data \
        $ALIGN
 
 echo "Attempting to visualize"

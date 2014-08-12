@@ -9,9 +9,11 @@ import multiprocessing
 import os
 import shutil
 import sys
+import time
 import random
 
 from feature.io.locate_files import pdbidFromFilename
+from feature.io.common import open_compressed
 
 from pocketfeature.algorithms import GaussianStats
 from pocketfeature.io import (
@@ -22,7 +24,10 @@ from pocketfeature.io.matrixvaluesfile import (
     MatrixValues,
     PassThroughItems,
 )
-from pocketfeature.tasks.core import Task
+from pocketfeature.tasks.core import (
+    Task,
+    ensure_all_imap_unordered_results_finish,
+)
 from pocketfeature.tasks.align import AlignScores
 from pocketfeature.tasks.build_background import get_pdb_list
 from pocketfeature.tasks.full_comparison import ComparePockets
@@ -41,8 +46,8 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
 
     buf = StringIO()
     job_files = {
-        'pdbA': gzip.open(pdbA),
-        'pdbB': gzip.open(pdbB),
+        'pdbA': open_compressed(pdbA),
+        'pdbB': open_compressed(pdbB),
 
         'background': open(params['background']),
         'normalization': open(params['normalization']),
@@ -79,6 +84,7 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
         ligandB=params['ligandB'], 
         cutoff=top_cutoff,
         allowed_pairs=params['allowed_pairs'],
+        std_threshold=params['std_threshold'],
         distance=params['distance'],
         check_cached_first=params.get('ff_cache') is not None,
         link_cached=params.get('ff_cache') is not None,
@@ -209,12 +215,13 @@ class BenchmarkPocketFeatureBackground(Task):
         self.log.info("Starting {0} comparison of {1} pairs".format(comp_name, num_comps))
         stats = GaussianStats()
         os.makedirs(comp_dir)
-        
+
         pf_params = {
             'background': self.params.background,
             'normalization': self.params.normalization,
             'distance': self.params.distance,
             'allowed_pairs': self.params.allowed_pairs,
+            'std_threshold': self.params.std_threshold,
             'ligandA': ligA,
             'ligandB': ligB,
             'alignment': self.params.alignment_method,
@@ -234,8 +241,10 @@ class BenchmarkPocketFeatureBackground(Task):
                     for pdbA, pdbB in pairs]
 
         if self.params.num_processors is not None and self.params.num_processors > 1:
-            pool = multiprocessing.Pool(self.params.num_processors)
-            all_scores = pool.imap(_run_pf_comparison_star, all_args)
+            self.pool = multiprocessing.Pool(self.params.num_processors)
+            async_results = self.pool.imap_unordered(_run_pf_comparison_star, all_args)
+            # Create a wrapper to ensure we don't prematurely exit
+            all_scores = ensure_all_imap_unordered_results_finish(async_results, expected=num_comps)
         else:
             all_scores = itertools.imap(_run_pf_comparison_star, all_args)
 
@@ -343,6 +352,10 @@ class BenchmarkPocketFeatureBackground(Task):
                                       choices=backgrounds.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
                                       default='classes',
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
+        parser.add_argument('-t', '--std-threshold', metavar='NSTD',
+                                     type=float,
+                                     default=1.0,
+                                     help="Number of standard deviations between to features to allow as 'similar'")
         parser.add_argument('-L', '--positive-ligands', metavar='LIGANDS',
                                                         default=None,
                                                         help='Comma-separated list of ligands to extract from positives')
