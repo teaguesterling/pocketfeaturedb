@@ -102,7 +102,7 @@ def pocket_from_pocket_def(pocket_def, if_no_ligand=pick_best_ligand,
         ligand = if_no_ligand(structure)
     else:
         chain_id, res_id, ligand_name = ligand_data
-        structure = focus_structure(strucgture, chain=chain_id)
+        structure = focus_structure(structure, chain=chain_id)
         if res_id is not None:
             ligand = find_ligand_in_structure(structure, res_id)
         else:
@@ -231,12 +231,15 @@ def calculate_residue_pair_normalization(key, thresholds, fileA, fileB, storeFil
             raw_score = compute_raw_cutoff_similarity(thresholds, a, b)
             stats.record(raw_score)
 
-    mode = float(stats.mode)
-    mean = float(stats.mean)
-    std = float(stats.std_dev)
-    n = int(stats.n)
-    low = float(stats.mins)
-    high = float(stats.maxes)
+    if stats.n > 0:
+        mode = float(stats.mode)
+        mean = float(stats.mean)
+        std = float(stats.std_dev)
+        n = int(stats.n)
+        low = float(stats.mins)
+        high = float(stats.maxes)
+    else:
+        mode = mean = std = n = low = high = 0
     
     return key, (mode, mean, std, n, low, high)
 
@@ -440,7 +443,8 @@ class GeneratePocketFeatureBackground(Task):
             raw_pockets = self.pool.imap_unordered(_pocket_from_pocket_def_star, all_args, 5)
             pockets = ensure_all_imap_unordered_results_finish(raw_pockets)
         else:
-            pockets = itertools.imap(_pocket_from_pdb_star, all_args)
+            self.pool = None
+            pockets = itertools.imap(_pocket_from_pocket_def_star, all_args)
 
         for idx, pocket in enumerate(pockets, start=1):
             if pocket is not None:
@@ -460,7 +464,8 @@ class GeneratePocketFeatureBackground(Task):
             if pocket is not None:
                 yield pocket
 
-        self.pool.close()
+        if self.pool:
+            self.pool.close()
             
         if self.params.progress:
             print("", file=sys.stderr)

@@ -112,7 +112,7 @@ class PDBReader(object):
     def fromFile(cls, path, pdbid=None):
         pdbid = cls.pdbIdFromFilename(path) if pdbid is None else pdbid
         opener = gzip.open if path.endswith('.gz') else open
-        with gzip.open(path) as f:
+        with opener(path) as f:
             return cls.fromStream(f, pdbid)
 
 
