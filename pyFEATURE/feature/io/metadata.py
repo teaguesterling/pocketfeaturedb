@@ -171,7 +171,9 @@ def loads(data, **kwargs):
 
 def dump(metadata, io):
     for key, value in metadata.items():
-        if type(value) in (list, set):
+        if isinstance(value, CONTAINER_TYPES):
+            if hasattr(value, 'items'):
+                value = [":".join(pair) for pair in value.items()]
             value = map(str, list(value))
             value = ",".join(value)
         else:

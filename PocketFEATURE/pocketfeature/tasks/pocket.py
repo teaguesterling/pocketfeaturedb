@@ -102,8 +102,11 @@ def find_ligand_in_structure(structure, ligand_name, index=0):
     lig_id = residuefile.read_residue_id(ligand_name)
     if isinstance(lig_id, basestring):
         found = find_residues_by_name(structure, lig_id)
+    elif isinstance(lig_id, int):
+        found = find_residues_by_id(structure, [lig_id], full=False)
     else:
         found = find_residues_by_id(structure, [lig_id])
+
     if len(found) > index:
         return found[index]
     else:

@@ -17,6 +17,9 @@ def write_residue_id(residue):
 
 
 def read_residue_id(res_id):
+    if isinstance(res_id, int):
+        return res_id
+
     tokens = res_id.split(DELIMITER)
     if len(tokens) == 1:
         return tokens[0]

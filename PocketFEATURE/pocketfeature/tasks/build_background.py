@@ -46,8 +46,10 @@ from pocketfeature.tasks.core import (
 )   
 
 from pocketfeature.tasks.pocket import (
-    pick_best_ligand,
     create_pocket_around_ligand,
+    find_ligand_in_structure,
+    focus_structure,
+    pick_best_ligand,
 )
 from pocketfeature.utils.args import LOG_LEVELS
 from pocketfeature.utils.ff import get_vector_type
@@ -85,11 +87,27 @@ def existing_file(path, mode='r', resume=False):
             yield (f, False)
 
 
-def pocket_from_pdb(pdb_path, find_ligand=pick_best_ligand,
-                              residue_centers=DEFAULT_CENTERS,
-                              distance_threshold=6.0):
+def pocket_from_pocket_def(pocket_def, if_no_ligand=pick_best_ligand,
+                                       residue_centers=DEFAULT_CENTERS,
+                                       distance_threshold=6.0):
+    pdb_data, ligand_data = pocket_def
+    
+    if isinstance(pdb_data, basestring):
+        pdb_path = pdb_data
+    else:
+        pdb_id, pdb_path = pdb_data
     structure = pdbfile.load_file(pdb_path)
-    ligand = find_ligand(structure)
+
+    if ligand_data is None:
+        ligand = if_no_ligand(structure)
+    else:
+        chain_id, res_id, ligand_name = ligand_data
+        structure = focus_structure(structure, chain=chain_id)
+        if res_id is not None:
+            ligand = find_ligand_in_structure(structure, res_id)
+        else:
+            ligand = find_ligand_in_structure(structure, ligand_name)
+        
     if ligand is not None:
         pocket = create_pocket_around_ligand(structure, 
                                              ligand, 
@@ -100,16 +118,63 @@ def pocket_from_pdb(pdb_path, find_ligand=pick_best_ligand,
     return pocket
 
 
-def _pocket_from_pdb_star(args):
-    pdb_path, args, kwargs = args
-    pocket = pocket_from_pdb(pdb_path, *args, **kwargs) 
+def _pocket_from_pocket_def_star(args):
+    pocket_def, args, kwargs = args
+    pocket = pocket_from_pocket_def(pocket_def, *args, **kwargs) 
     if pocket is not None:
         return pocket.pickelable
     else:
         return None
 
 
+def parse_pocket_def_line(line):
+    tokens = line.split()
+    pdbid = tokens[0]
+    lig_data = None
+
+    # TODO: Clean this up. Create a pocket def file format
+    if len(tokens) > 1:
+        chainid = None
+        resid = None
+        ligid = None
+
+        lig_info = tokens[1]
+        lig_info = lig_info.split('#')[0]  # Remove comments/counds
+        lig_info = lig_info.split('_', 2)  # Only split twice incase ligand
+                                           # ID contains an _
+        # XXX: Delimiter should be something other than an _, / would be good
+
+        n_lig_fields = len(lig_info)
+        
+        if n_lig_fields > 0:
+            chainid = lig_info[0]
+            if len(chainid) > 1:
+                raise ValueError("Chain ID {0} is longer than 1 character".format(chainid))
+        if n_lig_fields > 1:
+            try:
+                resid = int(lig_info[1])
+            except ValueError as e:
+                raise ValueError("Residue ID must be integer: {0}".format(str(e)))
+            if resid == 0:
+                resid = None
+        if n_lig_fields > 2:
+            ligid = lig_info[2]
+            if len(ligid) != 3:
+                raise ValueError("Ligand ID must be 3 characters: {0}".format(ligid))
+
+        lig_data = (chainid, resid, ligid)
+    
+    pocket_def = (pdbid, lig_data)
+    return pocket_def
+
+
 def get_pdb_list(pdb_src, pdb_dir=None, log=logging, fail_on_missing=True):
+    """ Takes a list of PDB IDs, a directory of PDBs, or a PocketDef file (TBD)
+        and returns a list of (PDB_Info, Ligand_Info)
+        where:
+            PDB_Info: (PDBID, PDB File)
+            Ligand_Info: (ChainID, ResidueID, LigandId)
+    """
     if not os.path.exists(pdb_src):
         raise RuntimeError("{0} not found".format(pdb_src))
     elif os.path.isdir(pdb_src):
@@ -118,13 +183,19 @@ def get_pdb_list(pdb_src, pdb_dir=None, log=logging, fail_on_missing=True):
         pdb_locs = [os.path.join(pdb_src, pdb_name) for pdb_name in pdb_names]
     else:
         log.info("Reading PDB IDs from file: {0}".format(pdb_src))
+        pdb_locs = []
         with open(pdb_src) as f:
-            pdb_locs = map(str.strip, f)
+            for line in f:
+                pocket_def = parse_pocket_def_line(line)
+                pdb_locs.append(pocket_def)
 
     found = []    
-    for pdbid in pdb_locs:
+    for pdbid, lig_data in pdb_locs:
         try:
-            found.append(find_pdb_file(pdbid, pdbdirList=pdb_dir))
+            pdb_file = find_pdb_file(pdbid, pdbdirList=pdb_dir)
+            pdb_data = (pdbid, pdb_file)
+            pocket_data = (pdb_data, lig_data)
+            found.append(pocket_data)
         except ValueError:
             if fail_on_missing:
             	log.error("Could not find PDB: {0}".format(pdbid))
@@ -164,12 +235,15 @@ def calculate_residue_pair_normalization(key, thresholds, fileA, fileB, storeFil
             raw_score = compute_raw_cutoff_similarity(thresholds, a, b)
             stats.record(raw_score)
 
-    mode = float(stats.mode)
-    mean = float(stats.mean)
-    std = float(stats.std_dev)
-    n = int(stats.n)
-    low = float(stats.mins)
-    high = float(stats.maxes)
+    if stats.n > 0:
+        mode = float(stats.mode)
+        mean = float(stats.mean)
+        std = float(stats.std_dev)
+        n = int(stats.n)
+        low = float(stats.mins)
+        high = float(stats.maxes)
+    else:
+        mode = mean = std = n = low = high = 0
     
     return key, (mode, mean, std, n, low, high)
 
@@ -359,21 +433,22 @@ class GeneratePocketFeatureBackground(Task):
 
         return values
 
-    def get_pockets(self, pdbs):
-        num_pdbs = len(pdbs)
+    def get_pockets(self, pocket_defs):
+        num_pdbs = len(pocket_defs)
         num_successful = 0
         num_failed = 0
         #num_processors = min(min(self.params.num_processors, num_pdbs), 12)
         num_processors = min(self.params.num_processors, num_pdbs)
         kwargs = {'distance_threshold': self.params.distance}
-        all_args = [(pdb, (), kwargs) for pdb in pdbs]
+        all_args = [(pocket_def, (), kwargs) for pocket_def in pocket_defs]
         if self.params.num_processors is not None and num_processors > 1:
             self.log.info("Extracting pockets with with {0} workers".format(num_processors))
             self.pool = multiprocessing.Pool(num_processors)
-            raw_pockets = self.pool.imap_unordered(_pocket_from_pdb_star, all_args, 5)
+            raw_pockets = self.pool.imap_unordered(_pocket_from_pocket_def_star, all_args, 5)
             pockets = ensure_all_imap_unordered_results_finish(raw_pockets)
         else:
-            pockets = itertools.imap(_pocket_from_pdb_star, all_args)
+            self.pool = None
+            pockets = itertools.imap(_pocket_from_pocket_def_star, all_args)
 
         for idx, pocket in enumerate(pockets, start=1):
             if pocket is not None:
@@ -393,7 +468,8 @@ class GeneratePocketFeatureBackground(Task):
             if pocket is not None:
                 yield pocket
 
-        self.pool.close()
+        if self.pool:
+            self.pool.close()
             
         if self.params.progress:
             print("", file=sys.stderr)
@@ -404,11 +480,11 @@ class GeneratePocketFeatureBackground(Task):
                 self._num_points += 1
                 yield point
 
-    def get_pocket_vectors(self, pdbs):
+    def get_pocket_vectors(self, pocket_defs):
         if self.params.max_points is not None:
             self.log.info("Shuffling PDBs since max_points specified")
             random.shuffle(pdbs)
-        pockets = self.get_pockets(pdbs)
+        pockets = self.get_pockets(pocket_defs)
         points = self.get_points(pockets)
         vectors = self.create_vectors(points)
         for vector in vectors:

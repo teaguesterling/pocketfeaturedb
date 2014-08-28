@@ -3,7 +3,7 @@ pocketfeaturedb
 
 PocketFEATURE Library
 
-Teague Sterling, Tianyun Lui
+Teague Sterling, Tianyun Liu
 2013-2014
 
 Libraries Included
