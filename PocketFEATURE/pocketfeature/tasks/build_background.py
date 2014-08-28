@@ -126,7 +126,11 @@ def get_pdb_list(pdb_src, pdb_dir=None, log=logging, fail_on_missing=True):
         try:
             found.append(find_pdb_file(pdbid, pdbdirList=pdb_dir))
         except ValueError:
-            log.warning("Could not find PDB: {0}".format(pdbid))
+            if fail_on_missing:
+            	log.error("Could not find PDB: {0}".format(pdbid))
+                raise
+            else:
+            	log.warning("Could not find PDB: {0}".format(pdbid))
   
     return found
 
