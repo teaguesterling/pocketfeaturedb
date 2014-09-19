@@ -18,3 +18,7 @@ def featurize_points(pointlist, feature_args={}, **kwargs):
     vectors = featurefile.load(result, **kwargs)
     return vectors
 
+def featurize_pdb(pdbid, feature_args={}, **kwargs):
+    result = backends.featurize_pdb(pdbid, **feature_args)
+    vectors = featurefile.load(result, **kwargs)
+    return vectors

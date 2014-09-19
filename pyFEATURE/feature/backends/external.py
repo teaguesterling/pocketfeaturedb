@@ -184,7 +184,8 @@ def generate_dssp_file(pdb_file, dssp_file=None, environ=None, **exec_params):
     return dssp_file
 
 
-def featurize(shells=None,
+def featurize(pdbid=None,
+              shells=None,
               width=None,
               exclude=None,
               properties=None,
@@ -228,6 +229,9 @@ def featurize(shells=None,
             raise RuntimeError("Required environmental variable {} not available".format(variable))
 
     exec_params['_env'] = environ
+
+    if pdbid is not None:
+        exec_args = [pdbid] + list(exec_args)
 
     if shells is not None:
         exec_params['n'] = shells
