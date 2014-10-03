@@ -339,7 +339,8 @@ class GeneratePocketFeatureBackground(Task):
         self.point_file = os.path.join(params.ff_dir, 'points.ptf')
 
         self.bg = self.generate_vector_stats()
-        self.norms = self.generate_score_stats()
+        if not params.skip_normalization:
+            self.norms = self.generate_score_stats()
 
                 
     def generate_vector_stats(self):
@@ -752,6 +753,9 @@ class GeneratePocketFeatureBackground(Task):
         parser.add_argument('--cleanup', action='store_true',
                                          default=False,
                                          help='Remove temporary FEATURE files upon completion [default: %(default)s]')
+        parser.add_argument('--skip-normalization', action='store_true', 
+                                                    default=False,
+                                                    help="Force skip the normalization calculation step")
         parser.add_argument('--all-data', action='store_true',
                                           default=False,
                                           help='Write out all temporary files [default: %(default)s]')
