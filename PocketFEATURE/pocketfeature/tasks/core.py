@@ -24,7 +24,7 @@ def ensure_all_imap_unordered_results_finish(result, expected=None, wait=0.5):
             yield next(result)
             just_started = False
         except StopIteration:
-            if result._length is None \
+            if hasattr(result, '_length') and result._length is None \
               or (expected is not None and result._index < expected):
                 time.sleep(wait)
             else:

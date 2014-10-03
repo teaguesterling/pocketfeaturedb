@@ -197,7 +197,11 @@ def get_pdb_list(pdb_src, pdb_dir=None, log=logging, fail_on_missing=True):
             pocket_data = (pdb_data, lig_data)
             found.append(pocket_data)
         except ValueError:
-            log.warning("Could not find PDB: {0}".format(pdbid))
+            if fail_on_missing:
+            	log.error("Could not find PDB: {0}".format(pdbid))
+                raise
+            else:
+            	log.warning("Could not find PDB: {0}".format(pdbid))
   
     return found
 
