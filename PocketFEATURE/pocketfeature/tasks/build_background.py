@@ -706,8 +706,10 @@ class GeneratePocketFeatureBackground(Task):
             """Generate background files for PocketFEATURE calculations""")
         input_parser = parser.add_mutually_exclusive_group(required=True)
         input_parser.add_argument('pdbs', metavar='PDBS',
+                                          nargs='?',
                                           help='Path to a file containing PDB ids or a directory of PDB files')
         input_parser.add_argument('--ptfs', metavar='PTF_DIR',
+                                            nargs='?',
                                             help='Path to a directory containing pre-extracted point files')
         parser.add_argument('--pdb-dir', metavar='PDB_DIR', 
                                          help='Directory to look for PDBs in [default: %(default)s|PDBS]',
