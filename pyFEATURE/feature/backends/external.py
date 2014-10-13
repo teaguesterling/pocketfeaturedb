@@ -30,6 +30,26 @@ except ImportError as e:
 SCRATCH_DIR = '/tmp'
 
 REQUIRED_ENVIRONMENT = ('FEATURE_DIR',)
+FEATURE_DIR_FILES = ('residue_templates.dat', 
+                     'amberM2_params.data')
+
+
+raw_which = sh.Command('which')
+
+try:
+    raw_featurize = str(raw_which('featurize'))
+except Exception:
+    raw_featurize = None
+
+if 'FEATURE_DIR' not in os.environ and raw_featurize is not None:
+    raw_featurize_root = os.path.dirname(raw_featurize)
+    _check_dirs = ('', 'data', '..', '../data')
+    for _dir in ('', 'data'):
+        _test_dir = os.path.join(raw_featurize_root, _dir)
+        if all(os.path.exists(os.path.join(_test_dir, item)) for item in FEATURE_DIR_FILES):
+            os.environ['FEATURE_DIR'] = _test_dir
+            break
+
 
 FEATURE_ROOT = os.environ.get('FEATURE_ROOT', '/usr/local/feature')
 
@@ -76,7 +96,6 @@ feature_environ = {
 default_environ = os.environ.copy()
 default_environ.update(feature_environ)
 
-raw_which = sh.Command('which')
 
 
 def _update_default_environ_from_feature_path(found_path):
