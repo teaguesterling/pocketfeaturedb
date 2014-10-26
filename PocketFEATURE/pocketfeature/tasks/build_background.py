@@ -180,7 +180,7 @@ def get_pdb_list(pdb_src, pdb_dir=None, log=logging, fail_on_missing=True):
     elif os.path.isdir(pdb_src):
         log.info("Looking for PDBs in directory: {0}".format(pdb_src))
         pdb_names = os.listdir(pdb_src)
-        pdb_locs = [os.path.join(pdb_src, pdb_name) for pdb_name in pdb_names]
+        pdb_locs = [(os.path.join(pdb_src, pdb_name), None) for pdb_name in pdb_names]
     else:
         log.info("Reading PDB IDs from file: {0}".format(pdb_src))
         pdb_locs = []
@@ -189,12 +189,12 @@ def get_pdb_list(pdb_src, pdb_dir=None, log=logging, fail_on_missing=True):
                 pocket_def = parse_pocket_def_line(line)
                 pdb_locs.append(pocket_def)
 
-    found = []    
-    for pdbid, lig_data in pdb_locs:
+    found = []
+    for pdbid, lig_info in pdb_locs:
         try:
             pdb_file = find_pdb_file(pdbid, pdbdirList=pdb_dir)
             pdb_data = (pdbid, pdb_file)
-            pocket_data = (pdb_data, lig_data)
+            pocket_data = pdb_data, lig_info
             found.append(pocket_data)
         except ValueError:
             if fail_on_missing:
@@ -495,7 +495,12 @@ class GeneratePocketFeatureBackground(Task):
 
     def get_points(self, pockets):
         for pocket in pockets:
-            for point in pocket.points:
+            points = list(pocket.points)
+            if self.params.all_data:
+                ptf_file = self.get_ptf_file(pocket)
+                with gzip.open(ptf_file, 'w') as f:
+                    pointfile.dump(points, f)
+            for point in points:
                 self._num_points += 1
                 yield point
 
@@ -664,6 +669,12 @@ class GeneratePocketFeatureBackground(Task):
                 scores_path = None
             scores_map[key] = scores_path
         return scores_map
+
+    def get_ptf_file(self, pocket):
+        sig = pocket.signature_string
+        ptf_file = "{}.ptf.gz".format(sig)
+        ptf_path = os.path.join(self.params.ff_dir, ptf_file)
+        return ptf_path
 
     def get_ff_file(self, vector):
         res_type = get_vector_type(vector)
