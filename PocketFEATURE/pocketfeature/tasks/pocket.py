@@ -53,43 +53,58 @@ def focus_structure(structure, model=0, chain=None):
     return focus
 
 
-def find_neighboring_residues(structure, queries, cutoff=6.0, 
-                                                  ordered=True,
-                                                  excluded=is_het_residue,
-                                                  residue_centers=None,
-                                                  skip_partial_residues=True):
+def find_neighboring_residues_and_points(structure, queries, cutoff=6.0, 
+                                                             ordered=True,
+                                                             excluded=is_het_residue,
+                                                             residue_centers=None,
+                                                             skip_partial_residues=True):
 
     all_atoms = list(structure.get_atoms())
     neighbors = NeighborSearch(all_atoms)
-    residues = set()
+    residues = []
+    picked = set()
     for query in queries:  # Search through query points
         found = neighbors.search(query, cutoff, 'R')  # Search of Residues
-        found = (res for res in found if not excluded(res))  # Possibly redundant
+        found = (res for res in found if not excluded(res) and res not in picked)
         if residue_centers is None:  # If adding any points
-            residues.add(found)
+            picked.add(found)
+            residues.append(found)
         else:  # Check if any active sites are within cutuff
             for residue in found:
                 centers = residue_centers(residue, skip_partial_residues=skip_partial_residues,
                                                    ignore_unknown_residues=True)
                 points = [point for code, point in centers]
-                meets_cutoff = (norm(query - pt) <= cutoff for pt in points)
+                meets_cutoff = [norm(query - pt) <= cutoff for pt in points]
+                picked_centers = [center for center, close in zip(centers, meets_cutoff) if close]
                 if any(meets_cutoff):
-                    residues.add(residue)
+                    residue_points = (residue, picked_centers)
+                    residues.append(residue_points)
+                    picked.add(residue)
     if ordered:
-        residues = sorted(residues, key=lambda r: r.get_id()[1])
+        residues = sorted(residues, key=lambda (r,p): r.get_id()[1])
     
-    return list(residues)
+    return residues
 
 
 def create_pocket_around_ligand(structure, ligand, cutoff=6.0, 
                                                    name=None,
                                                    residue_centers=DEFAULT_CENTERS, 
+                                                   exact_points=True,
                                                    **options):
     points = [atom.get_coord() for atom in ligand]
-    residues = find_neighboring_residues(structure, points, cutoff=cutoff, 
-                                                            ordered=True, 
-                                                            excluded=is_het_residue, 
-                                                            residue_centers=residue_centers)
+    residue_points = find_neighboring_residues_and_points(structure, points, cutoff=cutoff, 
+                                                                             ordered=True, 
+                                                                             excluded=is_het_residue, 
+                                                                             residue_centers=residue_centers)
+    residue_points = list(residue_points)
+    residues = [residue for residue, points in residue_points]
+
+    if exact_points:
+        point_map = dict(residue_points)
+        selected_centers = lambda res: point_map.get(res, [])
+    else:
+        selected_centers = residue_centers
+
     pdbid = structure.get_full_id()[0]
     pocket = Pocket(residues, pdbid=pdbid,
                               defined_by=ligand,
