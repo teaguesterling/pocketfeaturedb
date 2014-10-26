@@ -206,16 +206,16 @@ def get_pdb_list(pdb_src, pdb_dir=None, log=logging, fail_on_missing=True):
     return found
 
 
-def get_ptf_list(ptf_dir):
-    if not os.path.exists(ptf_dir):
+def get_ptf_list(ptf_src, log=logging):
+    if not os.path.exists(ptf_src):
         raise RuntimeError("{0} not found".format(ptf_src))
     elif os.path.isdir(ptf_src):
         log.info("Looking for PTFs in directory: {0}".format(ptf_src))
         ptf_names = os.listdir(ptf_src)
-        ptf_locs = [os.path.join(ptf_dir, ptf_name) for ptf_name in ptf_names]
+        ptf_locs = [os.path.join(ptf_src, ptf_name) for ptf_name in ptf_names]
     else:
         log.info("Reading Points from file: {0}".format(ptf_src))
-        ptf_locs = [ptf_dir]
+        ptf_locs = [ptf_src]
     return ptf_locs
 
 
@@ -367,7 +367,7 @@ class GeneratePocketFeatureBackground(Task):
                 ptfs = get_ptf_list(params.ptfs, log=self.log)
                 self._num_pdbs = len(ptfs)
                 log.info("Found {0} Point Files".format(self._num_pdbs))
-                vectors = self.get_predefined_vectors(ptfs)
+                vectors = self.get_pointfile_vectors(ptfs)
 
             stats, metadata, pdbs = self.process_vectors(vectors)
             bg = create_background_features_from_stats(stats,
@@ -502,7 +502,7 @@ class GeneratePocketFeatureBackground(Task):
     def get_predefined_points(self, predefined):
         for path in predefined:
             with open(path) as f:
-                points = pointfile.iload(f)
+                points = pointfile.loadi(f)
                 for point in points:
                     yield point
 
