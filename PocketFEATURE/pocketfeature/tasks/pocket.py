@@ -73,11 +73,10 @@ def find_neighboring_residues_and_points(structure, queries, cutoff=6.0,
             for residue in found:
                 centers = residue_centers(residue, skip_partial_residues=skip_partial_residues,
                                                    ignore_unknown_residues=True)
-                points = [point for code, point in centers]
-                meets_cutoff = [norm(query - pt) <= cutoff for pt in points]
-                picked_centers = [center for center, close in zip(centers, meets_cutoff) if close]
+                meets_cutoff = [norm(query - pt) <= cutoff for code, pt in centers]
                 if any(meets_cutoff):
-                    residue_points = (residue, picked_centers)
+                    close_centers = [center for center, close in zip(centers, meets_cutoff) if close]
+                    residue_points = (residue, close_centers)
                     residues.append(residue_points)
                     picked.add(residue)
     if ordered:
@@ -101,7 +100,7 @@ def create_pocket_around_ligand(structure, ligand, cutoff=6.0,
 
     if exact_points:
         point_map = dict(residue_points)
-        selected_centers = lambda res: point_map.get(res, [])
+        selected_centers = lambda res, *args, **kwargs: point_map.get(res, [])
     else:
         selected_centers = residue_centers
 
@@ -109,7 +108,7 @@ def create_pocket_around_ligand(structure, ligand, cutoff=6.0,
     pocket = Pocket(residues, pdbid=pdbid,
                               defined_by=ligand,
                               name=name,
-                              residue_centers=residue_centers)
+                              residue_centers=selected_centers)
     return pocket
 
 
