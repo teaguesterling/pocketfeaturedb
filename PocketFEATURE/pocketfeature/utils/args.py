@@ -1,4 +1,5 @@
 import argparse
+from argparse import ArgumentTypeError
 from collections import OrderedDict
 from gettext import gettext as _
 import gzip
@@ -50,7 +51,7 @@ class FileType(argparse.FileType):
             stream = self._opener(string, mode=self._mode, **self._extraargs)
         except OSError as e:
             message = _("can't open '%s': %s")
-            raise ArgumentTypeError(message % (string, e))
+            raise ArgumentError(message % (string, e))
         wrapped = self._wrapper(stream)
         return wrapped
 
