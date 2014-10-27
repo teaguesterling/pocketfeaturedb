@@ -1,5 +1,6 @@
 
 import itertools
+import os
 
 from feature.io import (
     featurefile,
@@ -16,9 +17,12 @@ FEATURIZE_METHODS = [
     external.featurize_points_tempfile,
 ]
 
+FEATURIZE_PTF_API = os.environ.get('FEATURIZE_PTF_API', 'modern').lower().strip()
+
 
 def standard_config():
     WORKING_FEATURIZE_METHOD = external.featurize_points
+
 
 def legacy_config():
     WORKING_FEATURIZE_METHOD = external.featurize_points_tempfile
@@ -27,22 +31,18 @@ def legacy_config():
 def determine_correct_featurize_method(points, _iter=True, **kwargs):
     errors = []
     error_indications = ('WARNING: ', 'ERROR: ', 'Usage: ')
-    for method in FEATURIZE_METHODS:
-        points, backup_points = itertools.tee(points)  # Make sure we don't lose any points
+    sources = itertools.tee(points, len(FEATURIZE_METHODS))
+    for these_points, method in zip(sources, FEATURIZE_METHODS):
         try:
-            result = method(points, _iter=True, **kwargs)  # TODO: Iter should not be passed in here for generality
+            result = method(these_points, _iter=True, **kwargs)  # TODO: Iter should not be passed in here for generality
             peek = list(itertools.islice(result, 3))
-            if any(line.startswith(indication) for indication in error_indications for line in peek):
-                points = backup_points
-                continue
-            else:
+            if not any(line.startswith(indication) for indication in error_indications for line in peek):
                 result = itertools.chain(peek, result)
                 WORKING_FEATURIZE_METHOD = method
+                del sources
                 return result
         except Exception as e:  # If anything goes wrong with streaming try tempfile
             errors.append(str(e))
-            points = backup_points
-            continue
     raise NotImplementedError("Failed to featurize. Errors were:\n{}".format('\n'.join(errors)))
 
 
@@ -68,3 +68,9 @@ def featurize_pdb(pdbid, feature_args={}, **kwargs):
     result = external.featurize_pdb(pdbid, **feature_args)
     vectors = featurefile.load(result, **kwargs)
     return vectors
+
+
+if FEATURIZE_PTF_API == 'legacy':
+    legacy_config()
+elif FEATURIZE_PTF_API == 'modern':
+    standard_config()

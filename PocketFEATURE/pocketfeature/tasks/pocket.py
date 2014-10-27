@@ -215,10 +215,11 @@ class PocketFinder(Task):
         from pocketfeature.utils.args import (
             decompress,
             FileType,
+            ProteinFileType,
         )
         parser = ArgumentParser("Identify and extract pockets around ligands in a PDB file")
         parser.add_argument('pdb', metavar='PDB', 
-                                   type=FileType.compressed('r'),
+                                   type=ProteinFileType.compressed('r'),
                                    nargs='?',
                                    default=decompress(stdin),
                                    help='Path to PDB file [default: STDIN]')
