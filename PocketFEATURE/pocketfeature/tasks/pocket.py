@@ -57,14 +57,9 @@ def find_neighboring_residues_and_points(structure, queries, cutoff=6.0,
                                                              ordered=True,
                                                              excluded=is_het_residue,
                                                              residue_centers=None,
-                                                             expand_disordered=True,
                                                              skip_partial_residues=True):
 
     all_atoms = list(structure.get_atoms())
-    if expand_disordered:
-        all_atoms = [a for atom in all_atoms 
-                       for a in (atom.disordered_get_list() 
-                        if atom.is_disordered() else [atom])]
     neighbors = NeighborSearch(all_atoms)
     residues = []
     picked = set()
@@ -107,7 +102,6 @@ def create_pocket_around_ligand(structure, ligand, cutoff=6.0,
     residue_points = find_neighboring_residues_and_points(structure, points, cutoff=cutoff, 
                                                                              ordered=True, 
                                                                              excluded=is_het_residue, 
-                                                                             expand_disordered=expand_disordered,
                                                                              residue_centers=residue_centers)
     residue_points = list(residue_points)
     residues = [residue for residue, points in residue_points]
