@@ -11,7 +11,7 @@ from feature.io.common import open_compressed
 
 from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity,
-    cutoff_modified_tanimoto_similarity,
+    cutoff_tversky22_similarity,
     cosine_similarity,
 )
 
@@ -32,6 +32,7 @@ from pocketfeature.tasks.pocket import (
 from pocketfeature.tasks.align import (
     align_scores_greedy,
     align_scores_munkres,
+    align_scores_only_best,
 )
 from pocketfeature.tasks.featurize import (
     featurize_points,
@@ -44,9 +45,10 @@ from pocketfeature.utils.args import LOG_LEVELS
 from pocketfeature.tasks.core import Task
 
 
-compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
-#compute_raw_cutoff_similarity = cosine_similarity
-compute_raw_cutoff_similarity = cutoff_modified_tanimoto_similarity
+#compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
+compute_raw_cutoff_similarity = cutoff_tversky22_similarity
+
+compute_alignment = align_scores_only_best
 
 
 def load_points(pdb_file,
@@ -280,7 +282,7 @@ class ComparePockets(Task):
         normalized = scores.slice_values(NORMALIZED_SCORE)
 
         log.info("Aligning Pockets")
-        alignment = align_scores_greedy(normalized, cutoff=params.cutoff)
+        alignment = compute_alignment(normalized, cutoff=params.cutoff)
         log.debug("Aligned {0} points".format(len(alignment)))
         total_score = sum(alignment.values())
         alignment_with_raw_scores = scores.subset_from_keys(alignment.keys())

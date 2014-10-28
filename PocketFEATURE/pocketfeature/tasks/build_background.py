@@ -24,8 +24,7 @@ from feature.io.locate_files import (
 
 from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity,
-    cutoff_modified_tanimoto_similarity,
-    cosine_similarity,
+    cutoff_tversky22_similarity,
     GaussianStats,
     unique_product,
 )
@@ -59,8 +58,7 @@ NUM_DIGITS_FOR_MODE = 3
 BG_COEFFS_COLUMNS = ('mode', 'mean', 'std_dev', 'n', 'min', 'max')
 
 
-compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
-compute_raw_cutoff_similarity = cutoff_modified_tanimoto_similarity
+compute_raw_cutoff_similarity = cutoff_tversky22_similarity
 
 
 @contextlib.contextmanager
