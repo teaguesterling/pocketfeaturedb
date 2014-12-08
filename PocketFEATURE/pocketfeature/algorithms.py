@@ -17,10 +17,7 @@ def cosine_similarity(dummy, a, b):
     return distance.cosine(a, b)
 
 
-def reference_cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
-    if check_sign:
-        raise NotImplementedError(
-            "Sign check not implemented in reference tanimoto similarity")
+def reference_cutoff_tanimoto_similarity(cutoffs, a, b):
     total = 0  # $all -> total
     comm = 0
     for i, (ax, bx) in enumerate(zip(a,b)):
@@ -36,10 +33,7 @@ def reference_cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
         return comm / (total * 2 - comm)
 
 
-def adjusted_reference_cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
-    if check_sign:
-        raise NotImplementedError(
-            "Sign check not implemented in reference tanimoto similarity")
+def adjusted_reference_cutoff_tanimoto_similarity(cutoffs, a, b):
     N = len(a)
     total = 0
     comm = 0
@@ -57,7 +51,7 @@ def adjusted_reference_cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=Fals
         return comm / total
 
 
-def cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
+def cutoff_tanimoto_similarity(cutoffs, a, b):
     """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
         This method takes two vectors and treats each pair of elments matched
         they differ by less than the supplied cutoff for that index.
@@ -69,9 +63,6 @@ def cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
     union = np.logical_or(a != 0, b != 0)
     union_size = np.count_nonzero(union)
     shared = union
-    if check_sign:
-        same_sign = np.sign(a) == np.sign(b)
-        shared = np.logical_and(same_sign, union)
     if union_size > 0:
         delta = np.abs(a[shared] - b[shared])
         intersection = delta < cutoffs[shared]
@@ -81,7 +72,7 @@ def cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
         return 0.
 
 
-def cutoff_modified_tanimoto_similarity(cutoffs, a, b, check_sign=False):
+def cutoff_tversky22_similarity(cutoffs, a, b):
     """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
         This method takes two vectors and treats each pair of elments matched
         they differ by less than the supplied cutoff for that index.
@@ -93,9 +84,6 @@ def cutoff_modified_tanimoto_similarity(cutoffs, a, b, check_sign=False):
     union = np.logical_or(a != 0, b != 0)
     union_size = np.count_nonzero(union)
     shared = union
-    if check_sign:
-        same_sign = np.sign(a) == np.sign(b)
-        shared = np.logical_and(same_sign, union)
     if union_size > 0:
         delta = np.abs(a[shared] - b[shared])
         intersection = delta < cutoffs[shared]
@@ -107,6 +95,12 @@ def cutoff_modified_tanimoto_similarity(cutoffs, a, b, check_sign=False):
 
 def normalize_score(score, mode):
     return 2 / (1 + (score / mode) ** 2) - 1
+
+
+def scale_score_to_pocket_size(nA, nB, nAlign, score):
+    coeff = nAlign / (nA + nB - nAlign)
+    rescaled = coeff * score
+    return rescaled
 
 
 def unique_product(p, q, skip=0):
