@@ -11,6 +11,14 @@ def property_dtype(property):
     return np.dtype(float)
 
 
+class StaticDefaultMixin(object):
+    @property
+    def mutable_type(self):
+        return type(self).__base__ 
+    def redefine(self, *args, **kwargs):
+        return self.mutable_type(*args, **kwargs)
+
+
 class ItemNameList(list):
     """ 
     Base container for storing field names
@@ -62,6 +70,14 @@ class PropertyList(ItemNameList):
         #definition = [(prop, property_dtype(prop)) for prop in self]
         # TODO: Customize the FEATURE vector dtype for a property list
         return np.float
+
+
+class DefaultItemNameList(ItemNameList, StaticDefaultMixin):
+    mutable_type = ItemNameList
+
+class DefaultPropertyList(PropertyList, StaticDefaultMixin):
+    mutable_type = PropertyList
+
 
 
 def loadi(src, container=PropertyList):
@@ -131,7 +147,7 @@ def dumps(props):
     return buf.getvalue()
 
 
-ALL = PropertyList([
+ALL = DefaultPropertyList([
     'ALIPHATIC_CARBON',
     'ALIPHATIC_CARBON_NEXT_TO_POLAR',
     'AMIDE',
@@ -228,7 +244,7 @@ ALL = PropertyList([
 ])
 
 
-PROTEINS = PropertyList([
+PROTEINS = DefaultPropertyList([
     'ATOM_TYPE_IS_C',
     'ATOM_TYPE_IS_CT',
     'ATOM_TYPE_IS_CA',
@@ -312,7 +328,7 @@ PROTEINS = PropertyList([
 ])
 
 
-METALS = PropertyList([
+METALS = DefaultPropertyList([
     'ALIPHATIC_CARBON',
     'AROMATIC_CARBON',
     'PARTIAL_POSITIVE_CARBON',

@@ -74,8 +74,8 @@ python setup.py install
 cd ../
 
 echo "RUNNING SANITY TEST"
-export PDB_DIR="./data"
-export DSSP_DIR="./data"
+export PDB_DIR="data"
+export DSSP_DIR="data"
 run_pf data/1qhx.pdb data/1qrd.pdb \
        -b data/background.ff \
        -n data/background.coeffs \

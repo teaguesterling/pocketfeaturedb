@@ -6,6 +6,7 @@ import itertools
 from pocketfeature.algorithms import (
     greedy_align,
     munkres_align,
+    only_best_align,
 )
 from pocketfeature.io import matrixvaluesfile
 from pocketfeature.io.matrixvaluesfile import MatrixValues
@@ -26,6 +27,12 @@ def align_scores_greedy(scores, cutoff):
     aligned = MatrixValues(greedy_align(filtered))
     return aligned
 
+def align_scores_only_best(scores, cutoff):
+    filtered_scores = ((k, v) for k, v in scores.items() if v <= cutoff)
+    filtered = MatrixValues(filtered_scores)
+    aligned = MatrixValues(only_best_align(filtered))
+    return aligned
+
 
 class AlignScores(Task):
     DEFAULT_CUTOFF = -0.15
@@ -33,6 +40,7 @@ class AlignScores(Task):
     ALIGNMENT_METHODS = {
         'greedy': align_scores_greedy,
         'munkres': align_scores_munkres,
+        'onlybest': align_scores_only_best,
     }
 
     def run(self):
@@ -67,7 +75,7 @@ class AlignScores(Task):
                                                     help='Value column index in score file to use for aligning [default: 1]')
         parser.add_argument('-m', '--method', metavar='ALIGN_METHOD',
                                       choices=cls.ALIGNMENT_METHODS,
-                                      default='greedy',
+                                      default='onlybest',
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
         parser.add_argument('-o', '--output', metavar='VALUES',
                                               type=FileType.compressed('w'),

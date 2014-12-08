@@ -24,8 +24,7 @@ from feature.io.locate_files import (
 
 from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity,
-    cutoff_modified_tanimoto_similarity,
-    cosine_similarity,
+    cutoff_tversky22_similarity,
     GaussianStats,
     unique_product,
 )
@@ -59,8 +58,7 @@ NUM_DIGITS_FOR_MODE = 3
 BG_COEFFS_COLUMNS = ('mode', 'mean', 'std_dev', 'n', 'min', 'max')
 
 
-compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
-compute_raw_cutoff_similarity = cutoff_modified_tanimoto_similarity
+compute_raw_cutoff_similarity = cutoff_tversky22_similarity
 
 
 @contextlib.contextmanager
@@ -180,7 +178,7 @@ def get_pdb_list(pdb_src, pdb_dir=None, log=logging, fail_on_missing=True):
     elif os.path.isdir(pdb_src):
         log.info("Looking for PDBs in directory: {0}".format(pdb_src))
         pdb_names = os.listdir(pdb_src)
-        pdb_locs = [os.path.join(pdb_src, pdb_name) for pdb_name in pdb_names]
+        pdb_locs = [(os.path.join(pdb_src, pdb_name), None) for pdb_name in pdb_names]
     else:
         log.info("Reading PDB IDs from file: {0}".format(pdb_src))
         pdb_locs = []
@@ -189,17 +187,34 @@ def get_pdb_list(pdb_src, pdb_dir=None, log=logging, fail_on_missing=True):
                 pocket_def = parse_pocket_def_line(line)
                 pdb_locs.append(pocket_def)
 
-    found = []    
-    for pdbid, lig_data in pdb_locs:
+    found = []
+    for pdbid, lig_info in pdb_locs:
         try:
             pdb_file = find_pdb_file(pdbid, pdbdirList=pdb_dir)
             pdb_data = (pdbid, pdb_file)
-            pocket_data = (pdb_data, lig_data)
+            pocket_data = pdb_data, lig_info
             found.append(pocket_data)
         except ValueError:
-            log.warning("Could not find PDB: {0}".format(pdbid))
+            if fail_on_missing:
+            	log.error("Could not find PDB: {0}".format(pdbid))
+                raise
+            else:
+            	log.warning("Could not find PDB: {0}".format(pdbid))
   
     return found
+
+
+def get_ptf_list(ptf_src, log=logging):
+    if not os.path.exists(ptf_src):
+        raise RuntimeError("{0} not found".format(ptf_src))
+    elif os.path.isdir(ptf_src):
+        log.info("Looking for PTFs in directory: {0}".format(ptf_src))
+        ptf_names = os.listdir(ptf_src)
+        ptf_locs = [os.path.join(ptf_src, ptf_name) for ptf_name in ptf_names]
+    else:
+        log.info("Reading Points from file: {0}".format(ptf_src))
+        ptf_locs = [ptf_src]
+    return ptf_locs
 
 
 def featurize_point_stream(points, featurize_args={}, load_args={}):
@@ -322,7 +337,8 @@ class GeneratePocketFeatureBackground(Task):
         self.point_file = os.path.join(params.ff_dir, 'points.ptf')
 
         self.bg = self.generate_vector_stats()
-        self.norms = self.generate_score_stats()
+        if not params.skip_normalization:
+            self.norms = self.generate_score_stats()
 
                 
     def generate_vector_stats(self):
@@ -340,11 +356,16 @@ class GeneratePocketFeatureBackground(Task):
                 with open(self.point_file) as f:
                     points = pointfile.load(f)
                     vectors = self.create_vectors(points)
-            else:
+            elif params.pdbs is not None:
                 pdbs = get_pdb_list(params.pdbs, pdb_dir=params.pdb_dir, log=self.log)
                 self._num_pdbs = len(pdbs)
                 log.info("Found {0} PDBs".format(self._num_pdbs))
                 vectors = self.get_pocket_vectors(pdbs)
+            elif params.ptfs is not None:
+                ptfs = get_ptf_list(params.ptfs, log=self.log)
+                self._num_pdbs = len(ptfs)
+                log.info("Found {0} Point Files".format(self._num_pdbs))
+                vectors = self.get_pointfile_vectors(ptfs)
 
             stats, metadata, pdbs = self.process_vectors(vectors)
             bg = create_background_features_from_stats(stats,
@@ -472,9 +493,21 @@ class GeneratePocketFeatureBackground(Task):
 
     def get_points(self, pockets):
         for pocket in pockets:
-            for point in pocket.points:
+            points = list(pocket.points)
+            if self.params.all_data:
+                ptf_file = self.get_ptf_file(pocket)
+                with gzip.open(ptf_file, 'w') as f:
+                    pointfile.dump(points, f)
+            for point in points:
                 self._num_points += 1
                 yield point
+
+    def get_predefined_points(self, predefined):
+        for path in predefined:
+            with open(path) as f:
+                points = pointfile.loadi(f)
+                for point in points:
+                    yield point
 
     def get_pocket_vectors(self, pocket_defs):
         if self.params.max_points is not None:
@@ -482,6 +515,12 @@ class GeneratePocketFeatureBackground(Task):
             random.shuffle(pdbs)
         pockets = self.get_pockets(pocket_defs)
         points = self.get_points(pockets)
+        vectors = self.create_vectors(points)
+        for vector in vectors:
+            yield vector
+
+    def get_pointfile_vectors(self, pointfiles):
+        points = self.get_predefined_points(pointfiles)
         vectors = self.create_vectors(points)
         for vector in vectors:
             yield vector
@@ -629,6 +668,12 @@ class GeneratePocketFeatureBackground(Task):
             scores_map[key] = scores_path
         return scores_map
 
+    def get_ptf_file(self, pocket):
+        sig = pocket.signature_string
+        ptf_file = "{}.ptf.gz".format(sig)
+        ptf_path = os.path.join(self.params.ff_dir, ptf_file)
+        return ptf_path
+
     def get_ff_file(self, vector):
         res_type = get_vector_type(vector)
         res_file = "{0}.ff.gz".format(res_type)
@@ -668,8 +713,13 @@ class GeneratePocketFeatureBackground(Task):
 
         parser = ArgumentParser(
             """Generate background files for PocketFEATURE calculations""")
-        parser.add_argument('pdbs', metavar='PDBS',
-                                    help='Path to a file containing PDB ids or a directory of PDB files')
+        input_parser = parser.add_mutually_exclusive_group(required=True)
+        input_parser.add_argument('pdbs', metavar='PDBS',
+                                          nargs='?',
+                                          help='Path to a file containing PDB ids or a directory of PDB files')
+        input_parser.add_argument('--ptfs', metavar='PTF_DIR',
+                                            nargs='?',
+                                            help='Path to a directory containing pre-extracted point files')
         parser.add_argument('--pdb-dir', metavar='PDB_DIR', 
                                          help='Directory to look for PDBs in [default: %(default)s|PDBS]',
                                          default=pdb_dir)
@@ -714,6 +764,9 @@ class GeneratePocketFeatureBackground(Task):
         parser.add_argument('--cleanup', action='store_true',
                                          default=False,
                                          help='Remove temporary FEATURE files upon completion [default: %(default)s]')
+        parser.add_argument('--skip-normalization', action='store_true', 
+                                                    default=False,
+                                                    help="Force skip the normalization calculation step")
         parser.add_argument('--all-data', action='store_true',
                                           default=False,
                                           help='Write out all temporary files [default: %(default)s]')

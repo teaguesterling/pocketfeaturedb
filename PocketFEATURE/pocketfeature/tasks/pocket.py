@@ -56,48 +56,70 @@ def focus_structure(structure, model=0, chain=None):
     return focus
 
 
-def find_neighboring_residues(structure, queries, cutoff=6.0, 
-                                                  ordered=True,
-                                                  excluded=is_het_residue,
-                                                  residue_centers=None,
-                                                  skip_partial_residues=True):
+def find_neighboring_residues_and_points(structure, queries, cutoff=6.0, 
+                                                             ordered=True,
+                                                             excluded=is_het_residue,
+                                                             residue_centers=None,
+                                                             skip_partial_residues=True):
 
     all_atoms = list(structure.get_atoms())
     neighbors = NeighborSearch(all_atoms)
-    residues = set()
+    residues = []
+    picked = set()
     for query in queries:  # Search through query points
         found = neighbors.search(query, cutoff, 'R')  # Search of Residues
-        found = (res for res in found if not excluded(res))  # Possibly redundant
+        found = [res for res in found if not excluded(res) and res not in picked]
         if residue_centers is None:  # If adding any points
-            residues.add(found)
+            picked.add(found)
+            residues.update(found)
         else:  # Check if any active sites are within cutuff
             for residue in found:
                 centers = residue_centers(residue, skip_partial_residues=skip_partial_residues,
                                                    ignore_unknown_residues=True)
-                points = [point for code, point in centers]
-                meets_cutoff = (norm(query - pt) <= cutoff for pt in points)
+                
+                meets_cutoff = [any((norm(q - pt) <= cutoff) for q in queries) for code, pt in centers]
                 if any(meets_cutoff):
-                    residues.add(residue)
+                    close_centers = [center for center, close in zip(centers, meets_cutoff) if close]
+                    residue_points = (residue, close_centers)
+                    residues.append(residue_points)
+                    picked.add(residue)
     if ordered:
-        residues = sorted(residues, key=lambda r: r.get_id()[1])
+        residues = sorted(residues, key=lambda (r,p): r.get_id()[1])
     
-    return list(residues)
+    return residues
 
 
 def create_pocket_around_ligand(structure, ligand, cutoff=6.0, 
                                                    name=None,
                                                    residue_centers=DEFAULT_CENTERS, 
+                                                   exact_points=True,
+                                                   expand_disordered=True,
                                                    **options):
-    points = [atom.get_coord() for atom in ligand]
-    residues = find_neighboring_residues(structure, points, cutoff=cutoff, 
-                                                            ordered=True, 
-                                                            excluded=is_het_residue, 
-                                                            residue_centers=residue_centers)
+    atoms = list(ligand)
+    if expand_disordered:
+        atoms = [atom_pos for atom in atoms 
+                          for atom_pos in (atom.disordered_get_list() 
+                           if atom.is_disordered() else [atom])]
+    points = [atom.get_coord() for atom in atoms]
+
+    residue_points = find_neighboring_residues_and_points(structure, points, cutoff=cutoff, 
+                                                                             ordered=True, 
+                                                                             excluded=is_het_residue, 
+                                                                             residue_centers=residue_centers)
+    residue_points = list(residue_points)
+    residues = [residue for residue, points in residue_points]
+
+    if exact_points:
+        point_map = dict(residue_points)
+        selected_centers = lambda res, *args, **kwargs: point_map.get(res, [])
+    else:
+        selected_centers = residue_centers
+
     pdbid = structure.get_full_id()[0]
     pocket = Pocket(residues, pdbid=pdbid,
                               defined_by=ligand,
                               name=name,
-                              residue_centers=residue_centers)
+                              residue_centers=selected_centers)
     return pocket
 
 
@@ -169,7 +191,8 @@ class PocketFinder(Task):
             print("Error: Could not find ligand in structure", file=params.log)
             return -1
 
-        pocket = create_pocket_around_ligand(structure, ligand, cutoff=params.distance)
+        pocket = create_pocket_around_ligand(structure, ligand, cutoff=params.distance,
+                                                                expand_disordered=not params.ignore_disordered)
 
         if len(pocket.residues) == 0:
             print("Error: No residues found within {0} angstroms of {1}".format(params.distance, ligand),
@@ -189,10 +212,11 @@ class PocketFinder(Task):
         from pocketfeature.utils.args import (
             decompress,
             FileType,
+            ProteinFileType,
         )
         parser = ArgumentParser("Identify and extract pockets around ligands in a PDB file")
         parser.add_argument('pdb', metavar='PDB', 
-                                   type=FileType.compressed('r'),
+                                   type=ProteinFileType.compressed('r'),
                                    nargs='?',
                                    default=decompress(stdin),
                                    help='Path to PDB file [default: STDIN]')
@@ -224,6 +248,9 @@ class PocketFinder(Task):
                                               type=float,
                                               default=cls.LIGAND_RESIDUE_DISTANCE,
                                               help='Residue active site distance threshold [default: %(default)s]')
+        parser.add_argument('-I', '--ignore-disordered', action='store_true', 
+                                                         default=False,
+                                                         help='Ignore additional coordinates for atoms [default: %(default)s]')
         parser.add_argument('-P', '--print-pointfile', action='store_true',
                                                        default=True,
                                                        help='Print point file (default behavior)')

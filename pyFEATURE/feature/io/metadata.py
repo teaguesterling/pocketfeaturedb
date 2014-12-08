@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import copy
 from cStringIO import StringIO
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 import operator
 import itertools
 
@@ -21,7 +21,9 @@ def _update_value(existing, value):
     if isinstance(existing, CONTAINER_TYPES):
         if not isinstance(value, CONTAINER_TYPES):
             value = [value]
-        if hasattr(existing, 'extend'):
+        if hasattr(existing, 'redefine'):
+            existing = existing.redefine(value)
+        elif hasattr(existing, 'extend'):
             existing.extend(value)
         elif hasattr(existing, 'update'):
             existing.update(value)
@@ -144,12 +146,17 @@ def extract_metadata(source,
     # Split the source, assuming metadata is at the beginning
     # (Keep only the group data, i)
     grouping = itertools.groupby(source, key=is_metadata)
-    grouping = itertools.imap(operator.itemgetter(1), grouping)
-
-    # We need to strictly consume all the group members here or
-    # they will be lost to the groupby iterator process
-    metadata_lines = list(next(grouping))
-    body_iterator = next(grouping)
+    #grouping = itertools.imap(operator.itemgetter(1), grouping)
+    has_metadata, first_group = next(grouping)
+    if has_metadata:
+        # We need to strictly consume all the group members here or
+        # they will be lost to the groupby iterator process
+        metadata_lines = list(first_group)
+        _, body_iterator = next(grouping)
+    else:
+        # Use the first group if no metadata was seen
+        metadata_lines = []
+        body_iterator = first_group
 
     parsed = load(metadata_lines,
                   is_metadata=is_metadata,

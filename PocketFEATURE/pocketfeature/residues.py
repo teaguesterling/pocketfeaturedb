@@ -30,10 +30,10 @@ CENTERS = {
     'PRO': [['N', 'CA', 'CB', 'CD', 'CG']],
     'GLN': [['OE1', 'CD', 'NE2']],
     'PHE': [['CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ']],
-    'TRP': [['CD2', 'CE2', 'CE3', 'CZ2', 'CZ3', 'CH2'],
-            ['NE1']],
-    'TYR': [['CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ'],
-            ['OH']],
+    'TRP': [['NE1'],
+            ['CD2', 'CE2', 'CE3', 'CZ2', 'CZ3', 'CH2']],
+    'TYR': [['OH'],
+            ['CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ']],
 }
 
 

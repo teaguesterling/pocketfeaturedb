@@ -16,8 +16,9 @@ from feature.io.pointfile import (
     Point3D,
 )
 from feature.properties import (
-    ItemNameList,
-    PropertyList, 
+    DEFAULT_PROPERTIES,
+    DefaultItemNameList,
+    DefaultPropertyList, 
 )
 
 
@@ -29,6 +30,7 @@ COORDINANTS = 'COORDINANTS'
 DESCRIPTION = 'DESCRIPTION'
 REAL_NAME = 'REAL_NAME'
 
+DEFAULT_COMMENTS = DefaultItemNameList([COORDINANTS, DESCRIPTION])
 
 def rename_vector_from_comment(vector, comment):
     if vector.has_named_comment(comment):
@@ -42,12 +44,11 @@ class FeatureMetaData(MetaData):
     DEFAULTS = {
         'EXCLUDED_RESIDUES': ['HETATM'],
         'PDBID_LIST': [],
-        'PROPERTIES': PropertyList(),
-        'COMMENTS': ItemNameList([COORDINANTS, DESCRIPTION]),
+        'PROPERTIES': DEFAULT_PROPERTIES,  # Not mutable but replacable
+        'COMMENTS': DEFAULT_COMMENTS,      # Not mutable but replacable
         'SHELLS': 6,
         'SHELL_WIDTH': 1.25,
         'VERBOSITY': 0,
-        'TEST': "YES",
     }
 
     def __init__(self, items=[], *args, **kwargs):
@@ -110,7 +111,7 @@ class FeatureMetaData(MetaData):
 
     @property
     def comments(self):
-        return self.get('COMMENTS', ItemNameList())
+        return self.get('COMMENTS', DEFAULT_COMMENTS)
 
     def create_vector_template(self):
         """ Generate an empty FEATURE vector object for the given metadata """
@@ -359,7 +360,7 @@ def extract_line_components(line):
 
 def _load_vectors_using_metadata(metadata, lines):
     """ Using metadata as a guide, generate FEATURE vectors from lines """
-    comment_fields = metadata.get('COMMENTS', ItemNameList())
+    comment_fields = metadata.get('COMMENTS', DEFAULT_COMMENTS)
     if COORDINANTS in comment_fields:
         coords_at = comment_fields.index(COORDINANTS)
     else:
@@ -407,7 +408,7 @@ def _load_vectors_using_metadata(metadata, lines):
 def _dump_vectors_using_metadata(metadata, vectors, io):
     """ Using metadata as a guide generate FEATURE vector strings from a
         set of vectors and write to some stream """
-    comment_fields = metadata.get('COMMENTS', ItemNameList())
+    comment_fields = metadata.get('COMMENTS', DEFAULT_COMMENTS)
     try:
         coords_at = comment_fields.index(COORDINANTS)
     except ValueError:

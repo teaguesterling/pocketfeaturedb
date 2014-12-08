@@ -6,6 +6,7 @@ import gzip
 import itertools
 import logging
 import multiprocessing
+import operator
 import os
 import shutil
 import sys
@@ -34,9 +35,14 @@ from pocketfeature.tasks.full_comparison import ComparePockets
 from pocketfeature.utils.args import LOG_LEVELS
 
 
+def get_pdb_files(source, pdb_dir=None, log=logging):
+    pdb_info = get_pdb_list(source, pdb_dir=pdb_dir, log=log)
+    pdbs = [path for (pdbid, path), lig in pdb_info]
+    return pdbs
+
+
 def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
     top_cutoff, cutoffs = cutoffs[0], cutoffs[1:]
-
     pdbidA = pdbidFromFilename(pdbA)
     pdbidB = pdbidFromFilename(pdbB)
     key = (pdbidA, pdbidB)
@@ -273,10 +279,8 @@ class BenchmarkPocketFeatureBackground(Task):
         return scores, stats
 
     def compare_positives(self):
-        positives_data = get_pdb_list(self.params.positives, pdb_dir=self.params.pdb_dir,
-                                                             log=self.log)
-        positives = [pdb_path for (pdbid, pdb_path), _ in positives_data]
-#        pairs = itertools.combinations(positives, 2)
+        positives = get_pdb_files(self.params.positives, pdb_dir=self.params.pdb_dir,
+                                                         log=self.log)
         pairs = itertools.combinations_with_replacement(positives, 2)
         output = self.params.positives_out
         scores, stats = self.compare_pdb_pairs(pairs, 'positives', output,
@@ -286,12 +290,10 @@ class BenchmarkPocketFeatureBackground(Task):
         return stats
     
     def compare_controls(self):
-        positives_data = get_pdb_list(self.params.positives, pdb_dir=self.params.pdb_dir,
-                                                             log=self.log)
-        controls_data = get_pdb_list(self.params.controls, pdb_dir=self.params.pdb_dir,
-                                                           log=self.log)
-        positives = [pdb_path for (pdbid, pdb_path), _ in positives_data]
-        controls = [pdb_path for (pdbid, pdb_path), _ in controls_data]
+        positives = get_pdb_files(self.params.positives, pdb_dir=self.params.pdb_dir,
+                                                         log=self.log)
+        controls = get_pdb_files(self.params.controls, pdb_dir=self.params.pdb_dir,
+                                                       log=self.log)
         pairs = itertools.product(positives, controls)
         output = self.params.controls_out
         scores, stats = self.compare_pdb_pairs(pairs, 'controls', output,

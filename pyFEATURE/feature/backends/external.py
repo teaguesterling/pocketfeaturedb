@@ -18,9 +18,38 @@ import tempfile
 
 import sh
 
+try:
+    import tempfile
+    from feature.io import pointfile
+    CAN_USE_TEMP_POINTFILE = True
+except ImportError as e:
+    import warnings
+    warnings.warning("Cannot use temporary pointfile with FEATURIZE: {}".format(str(e)))
+    CAN_USE_TEMP_POINTFILE = False
+
 SCRATCH_DIR = '/tmp'
 
 REQUIRED_ENVIRONMENT = ('FEATURE_DIR',)
+FEATURE_DIR_FILES = ('residue_templates.dat', 
+                     'amberM2_params.data')
+
+
+raw_which = sh.Command('which')
+
+try:
+    raw_featurize = str(raw_which('featurize'))
+except Exception:
+    raw_featurize = None
+
+if 'FEATURE_DIR' not in os.environ and raw_featurize is not None:
+    raw_featurize_root = os.path.dirname(raw_featurize)
+    _check_dirs = ('', 'data', '..', '../data')
+    for _dir in ('', 'data'):
+        _test_dir = os.path.join(raw_featurize_root, _dir)
+        if all(os.path.exists(os.path.join(_test_dir, item)) for item in FEATURE_DIR_FILES):
+            os.environ['FEATURE_DIR'] = _test_dir
+            break
+
 
 FEATURE_ROOT = os.environ.get('FEATURE_ROOT', '/usr/local/feature')
 
@@ -67,7 +96,6 @@ feature_environ = {
 default_environ = os.environ.copy()
 default_environ.update(feature_environ)
 
-raw_which = sh.Command('which')
 
 
 def _update_default_environ_from_feature_path(found_path):
@@ -184,7 +212,8 @@ def generate_dssp_file(pdb_file, dssp_file=None, environ=None, **exec_params):
     return dssp_file
 
 
-def featurize(shells=None,
+def featurize(pdbid=None,
+              shells=None,
               width=None,
               exclude=None,
               properties=None,
@@ -222,12 +251,14 @@ def featurize(shells=None,
         environ['PDB_DIR'] = pdb_dir
     if dssp_dir is not None:
         environ['DSSP_DIR'] = dssp_dir
-    
     for variable in REQUIRED_ENVIRONMENT:
         if variable not in environ:
             raise RuntimeError("Required environmental variable {} not available".format(variable))
 
     exec_params['_env'] = environ
+
+    if pdbid is not None:
+        exec_args = [pdbid] + list(exec_args)
 
     if shells is not None:
         exec_params['n'] = shells
@@ -306,7 +337,8 @@ def featurize_pointfile(point_file=None,
                      search_in=search_in,
                      working_dir=working_dir,
                      environ=environ,
-                     with_errors=with_errors)
+                     with_errors=with_errors,
+                     **options)
 
 
 def featurize_points(points,
@@ -347,6 +379,54 @@ def featurize_points(points,
                      with_errors=with_errors,
                      _in=points,
                      **options)
+
+
+def featurize_points_tempfile(points,
+                              shells=None,
+                              width=None,
+                              exclude=None,
+                              properties=None,
+                              search_in=None,
+                              working_dir=None,
+                              environ=None,
+                              with_errors=False,
+                              **options):
+    """ Run featurize on a given pointfile from a tempfile
+
+        Runs featurize from a pointfile using external binaries
+
+        Parameters:
+            point_file: pointfile stream to featurize
+        Optional Parameters:
+            shells:      Number of shells to featurize [Inmplicit: 6]
+            width:       Shell width to for each shell [Inmplicit: 1.5]
+            exclude:     Residues to exclude [Implicit: [HETATM]]
+            properties:  Properties file to use
+            search:      Directory to search first for PDBs/DSSPs
+            working_dir: Directory to run featurize in
+
+        Returns: File-like object of FEATURIZE results
+    """
+
+    if not CAN_USE_TEMP_POINTFILE:
+        raise NotImplementedError("Failure to import pointfile or tempfile module. Cannot featurize via file")
+
+    with tempfile.NamedTemporaryFile() as f:
+        for line in points:
+            f.write(line)
+        f.flush()
+        result = featurize_pointfile(point_file=f.name,
+                                     shells=shells,
+                                     width=width,
+                                     exclude=exclude,
+                                     properties=properties,
+                                     search_in=search_in,
+                                     working_dir=working_dir,
+                                     environ=environ,
+                                     with_errors=with_errors,
+                                     **options)
+        for line in result:
+            yield line 
 
 
 def featurize_pdb(pdb,
