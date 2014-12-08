@@ -88,6 +88,7 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
         distance=params['distance'],
         check_cached_first=params.get('ff_cache') is not None,
         link_cached=params.get('ff_cache') is not None,
+        rescale=params.get('rescale_scores', False),
         log_level='error',
         **job_files
     )
@@ -229,6 +230,7 @@ class BenchmarkPocketFeatureBackground(Task):
             'dssp_dir': self.params.dssp_dir,
             'ff_cache': self.ff_cache,
             'ptf_cache': self.ptf_cache,
+            'rescale_scores': self.params.rescale_scores,
         }
         self.failed_scores = 0
         self.successful_scores = 0
@@ -271,8 +273,9 @@ class BenchmarkPocketFeatureBackground(Task):
         return scores, stats
 
     def compare_positives(self):
-        positives = get_pdb_list(self.params.positives, pdb_dir=self.params.pdb_dir,
-                                                        log=self.log)
+        positives_data = get_pdb_list(self.params.positives, pdb_dir=self.params.pdb_dir,
+                                                             log=self.log)
+        positives = [pdb_path for (pdbid, pdb_path), _ in positives_data]
 #        pairs = itertools.combinations(positives, 2)
         pairs = itertools.combinations_with_replacement(positives, 2)
         output = self.params.positives_out
@@ -283,10 +286,12 @@ class BenchmarkPocketFeatureBackground(Task):
         return stats
     
     def compare_controls(self):
-        positives = get_pdb_list(self.params.positives, pdb_dir=self.params.pdb_dir,
-                                                        log=self.log)
-        controls = get_pdb_list(self.params.controls, pdb_dir=self.params.pdb_dir,
-                                                      log=self.log)
+        positives_data = get_pdb_list(self.params.positives, pdb_dir=self.params.pdb_dir,
+                                                             log=self.log)
+        controls_data = get_pdb_list(self.params.controls, pdb_dir=self.params.pdb_dir,
+                                                           log=self.log)
+        positives = [pdb_path for (pdbid, pdb_path), _ in positives_data]
+        controls = [pdb_path for (pdbid, pdb_path), _ in controls_data]
         pairs = itertools.product(positives, controls)
         output = self.params.controls_out
         scores, stats = self.compare_pdb_pairs(pairs, 'controls', output,
@@ -394,6 +399,9 @@ class BenchmarkPocketFeatureBackground(Task):
         parser.add_argument('--progress', action='store_true',
                                           default=False,
                                           help='Show interactive progress [default: %(default)s]')
+        parser.add_argument('--rescale-scores', action='store_true',
+                                          default=False,
+                                          help='EXPERIMENTAL: Rescale scores based on pocket size [default: %(default)s')
         parser.add_argument('--log', metavar='LOG',
                                      type=FileType,
                                      default=stderr,
