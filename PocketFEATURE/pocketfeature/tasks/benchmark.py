@@ -373,7 +373,7 @@ class BenchmarkPocketFeatureBackground(Task):
                                               default=[.1, .1, 0, -0.1, -0.15, -0.2, -0.25, -0.3],
                                               help='Alignment score thresholds [default: %(default)s]')
         parser.add_argument('-A', '--alignment-method', metavar='ALIGNMENT',
-                                              default='greedy',
+                                              default='onlybest',
                                               help='Alignment method to use [default: %(default)s]')
         parser.add_argument('-o', '--positives-out', metavar='POSITIVE_OUT',
                                                      default=cls.POS_OUT_DEFAULT,

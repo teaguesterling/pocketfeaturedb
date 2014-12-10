@@ -27,6 +27,7 @@ def align_scores_greedy(scores, cutoff):
     aligned = MatrixValues(greedy_align(filtered))
     return aligned
 
+
 def align_scores_only_best(scores, cutoff):
     filtered_scores = ((k, v) for k, v in scores.items() if v <= cutoff)
     filtered = MatrixValues(filtered_scores)

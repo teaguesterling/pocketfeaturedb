@@ -1,6 +1,7 @@
 
 import itertools
 import os
+import warnings
 
 from feature.io import (
     featurefile,
@@ -21,25 +22,28 @@ FEATURIZE_PTF_API = os.environ.get('FEATURIZE_PTF_API', 'modern').lower().strip(
 
 
 def standard_config():
+    global WORKING_FEATURIZE_METHOD
     WORKING_FEATURIZE_METHOD = external.featurize_points
 
 
 def legacy_config():
+    global WORKING_FEATURIZE_METHOD
     WORKING_FEATURIZE_METHOD = external.featurize_points_tempfile
 
 
 def determine_correct_featurize_method(points, _iter=True, **kwargs):
+    warnings.warn("Attempting to determine FEATURE pointfile calling method")
     errors = []
     error_indications = ('WARNING: ', 'ERROR: ', 'Usage: ')
-    sources = itertools.tee(points, len(FEATURIZE_METHODS))
-    for these_points, method in zip(sources, FEATURIZE_METHODS):
+    point_source = iter(points)
+    test = itertools.islice(point_source, 1)
+    points = itertools.chain(test, point_source)
+    for method in FEATURIZE_METHODS:
         try:
-            result = method(these_points, _iter=True, **kwargs)  # TODO: Iter should not be passed in here for generality
-            peek = list(itertools.islice(result, 3))
-            if not any(line.startswith(indication) for indication in error_indications for line in peek):
-                result = itertools.chain(peek, result)
+            test_result = list(method(test, _iter=True, **kwargs))
+            if not any(line.startswith(indication) for indication in error_indications for line in test_result):
                 WORKING_FEATURIZE_METHOD = method
-                del sources
+                result = method(points, _iter=True, **kwargs)
                 return result
         except Exception as e:  # If anything goes wrong with streaming try tempfile
             errors.append(str(e))
@@ -74,3 +78,5 @@ if FEATURIZE_PTF_API == 'legacy':
     legacy_config()
 elif FEATURIZE_PTF_API == 'modern':
     standard_config()
+else:
+    warnings.warn("Invalid value for FEATURIZE_PTF_API enviornmental variable")

@@ -454,7 +454,6 @@ class GeneratePocketFeatureBackground(Task):
         num_pdbs = len(pocket_defs)
         num_successful = 0
         num_failed = 0
-        #num_processors = min(min(self.params.num_processors, num_pdbs), 12)
         num_processors = min(self.params.num_processors, num_pdbs)
         kwargs = {'distance_threshold': self.params.distance}
         all_args = [(pocket_def, (), kwargs) for pocket_def in pocket_defs]

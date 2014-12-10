@@ -3,10 +3,11 @@
 from __future__ import division
 
 from collections import (
-    defaultdict,
     Counter,
+    defaultdict,
+    OrderedDict,
 )
-from operator import itemgetter
+import operator
 
 import numpy as np
 from scipy.spatial import distance
@@ -17,10 +18,7 @@ def cosine_similarity(dummy, a, b):
     return distance.cosine(a, b)
 
 
-def reference_cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
-    if check_sign:
-        raise NotImplementedError(
-            "Sign check not implemented in reference tanimoto similarity")
+def reference_cutoff_tanimoto_similarity(cutoffs, a, b):
     total = 0  # $all -> total
     comm = 0
     for i, (ax, bx) in enumerate(zip(a,b)):
@@ -36,10 +34,7 @@ def reference_cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
         return comm / (total * 2 - comm)
 
 
-def adjusted_reference_cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
-    if check_sign:
-        raise NotImplementedError(
-            "Sign check not implemented in reference tanimoto similarity")
+def adjusted_reference_cutoff_tanimoto_similarity(cutoffs, a, b):
     N = len(a)
     total = 0
     comm = 0
@@ -81,7 +76,7 @@ def cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
         return 0.
 
 
-def cutoff_modified_tanimoto_similarity(cutoffs, a, b, check_sign=False):
+def cutoff_tversky22_similarity(cutoffs, a, b, check_sign=False):
     """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
         This method takes two vectors and treats each pair of elments matched
         they differ by less than the supplied cutoff for that index.
@@ -154,7 +149,7 @@ def greedy_align(scores, maximize=False):
     # Takes a MatrixValue object instead of an array for now
     accepted = []
     chosen_keys = defaultdict(set)
-    ordered_items = sorted(scores.items(), key=itemgetter(1), reverse=maximize)
+    ordered_items = sorted(scores.items(), key=operator.itemgetter(1), reverse=maximize)
     for keys, value in ordered_items:
 	# Make sure we only check that a key has been chosen from a given item
 	indexed_keys = list(enumerate(keys))
@@ -163,6 +158,43 @@ def greedy_align(scores, maximize=False):
                 chosen_keys[idx].add(key)
             accepted.append((keys, value))
     return accepted
+
+
+def only_best_align(scores, maximize=False):
+    # Determine functions/defaults
+    if maximize:
+        default = None, -np.inf
+        is_getter = operator.gt
+    else:
+        default = None, np.inf
+        is_better = operator.lt
+
+    best_scoresA = OrderedDict()
+    best_scoresB = OrderedDict()
+
+    # Find the best score for each point in the alignment
+    for (keyA, keyB), score in scores.items():
+        best_keyA, best_scoreA = best_scoresA.get(keyA, default)
+        best_keyB, best_scoreB = best_scoresB.get(keyB, default)
+        if is_better(score, best_scoreA):
+            best_scoresA[keyA] = keyB, score
+        if is_better(score, best_scoreB):
+            best_scoresB[keyB] = keyA, score
+
+    # Select only those pairs where the best is mutual
+    accepted = []
+    for keyA, (keyB, score) in best_scoresA.items():
+        best_keyB, scoreB = best_scoresB.get(keyB, default)
+        if best_keyB is None:
+            continue
+        elif best_keyB == keyA:
+            accepted.append(((keyA, keyB), score))
+
+    # Order the aligned points by score
+    prioritized = sorted(accepted, key=operator.itemgetter(1), reverse=maximize)
+
+    return accepted
+
 
 
 def munkres_align(scores, shift_negative=False, maximize=False):
@@ -364,7 +396,7 @@ class Indexer(defaultdict):
 
     def items(self):
         items = super(Indexer, self).items()
-        return sorted(items, key=itemgetter(1))
+        return sorted(items, key=operator.itemgetter(1))
 
     def __repr__(self):
         return 'Indexer({0})'.format(repr(self.ordered_keys()))
