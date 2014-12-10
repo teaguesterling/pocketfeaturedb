@@ -43,11 +43,14 @@ def focus_structure(structure, model=0, chain=None):
         chains = focus.get_chains()
 
     if chain is not None:
-        found = [c for c in chains if c.get_id() == chain]
+        if isinstance(chain, int):
+            found = [list(chains)[chain]]
+        else:
+            found = [c for c in chains if c.get_id() == chain]
         if len(found) == 0:
-            raise ValueError("Chain {0} not found in {1}".format(model, structure))
+            raise ValueError("Chain {0} not found in {1}".format(chain, structure))
         elif len(found) > 1:
-            raise ValueError("Chain {0} ambigous in {1}".format(model, structure))
+            raise ValueError("Chain {0} ambigous in {1}".format(chain, structure))
         else:
             focus = found[0]
     return focus

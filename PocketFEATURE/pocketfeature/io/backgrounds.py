@@ -8,6 +8,7 @@ import itertools
 from pocketfeature.io import featurefile
 from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity, 
+    cutoff_tversky22_similarity,
     normalize_score,
 )
 from pocketfeature.io.featurefile import PocketFeatureBackgroundMetaData
@@ -55,6 +56,11 @@ ALLOWED_VECTOR_TYPE_PAIRS = {
     'classes': make_allowed_pair_sets(CLASSES.values()),
 }
 
+ALLOWED_SIMILARITY_METRICS = {
+    'tanimoto': cutoff_tanimoto_similarity,
+    'tversky22': cutoff_tversky22_similarity,
+}
+
 
 class BackgroundEnvironment(object):
     """ An object containing information about a calculated PocketFEATURE background """
@@ -64,7 +70,7 @@ class BackgroundEnvironment(object):
                                 metadata=None,
                                 vector_type=get_vector_type,
                                 make_type_key=make_vector_type_key,
-                                compare_function=cutoff_tanimoto_similarity,
+                                compare_function=cutoff_tversky22_similarity,
                                 normalize_function=normalize_score,
                                 allowed_pairs=None,
                                 std_threshold=1.0):

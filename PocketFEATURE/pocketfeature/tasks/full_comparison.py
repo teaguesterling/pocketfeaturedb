@@ -12,7 +12,6 @@ from feature.io.common import open_compressed
 from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity,
     cutoff_tversky22_similarity,
-    cosine_similarity,
 )
 
 from pocketfeature.io import (
@@ -22,6 +21,7 @@ from pocketfeature.io import (
     pdbfile,
     residuefile,
 )
+from pocketfeature.algorithms import scale_score_to_pocket_size
 from pocketfeature.io.backgrounds import NORMALIZED_SCORE
 from pocketfeature.tasks.pocket import (
     create_pocket_around_ligand,
@@ -45,9 +45,7 @@ from pocketfeature.utils.args import LOG_LEVELS
 from pocketfeature.tasks.core import Task
 
 
-#compute_raw_cutoff_similarity = cutoff_tanimoto_similarity
 compute_raw_cutoff_similarity = cutoff_tversky22_similarity
-
 compute_alignment = align_scores_only_best
 
 
@@ -293,10 +291,16 @@ class ComparePockets(Task):
             params.alignment.close()
             
         log.info("Alignment Score: {0}".format(total_score))
+        if params.rescale:
+            nAlign = len(alignment.values())
+            total_score = scale_score_to_pocket_size(_numA, _numB, nAlign, total_score)
+
         print("{0}\t{1}\t{2:0.5f}".format(signature_stringA,
                                           signature_stringB,
                                           total_score),
               file=params.output)
+
+
         
         log.info("Creating PyMol scripts")
         scriptA, scriptB = create_alignment_visualizations(pointsA, 
@@ -471,6 +475,9 @@ class ComparePockets(Task):
                                      default=None,
                                      nargs='?',
                                      help='Path to second PyMol script [default: None]')
+        parser.add_argument('--rescale', action='store_true',
+                                         default=False,
+                                         help='EXPERIMENTAL: Rescale score to pocket size [default: No]')
         parser.add_argument('--log', metavar='LOG',
                                      type=FileType,
                                      default=stderr,

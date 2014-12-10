@@ -52,7 +52,7 @@ def adjusted_reference_cutoff_tanimoto_similarity(cutoffs, a, b):
         return comm / total
 
 
-def cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
+def cutoff_tanimoto_similarity(cutoffs, a, b):
     """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
         This method takes two vectors and treats each pair of elments matched
         they differ by less than the supplied cutoff for that index.
@@ -64,9 +64,6 @@ def cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
     union = np.logical_or(a != 0, b != 0)
     union_size = np.count_nonzero(union)
     shared = union
-    if check_sign:
-        same_sign = np.sign(a) == np.sign(b)
-        shared = np.logical_and(same_sign, union)
     if union_size > 0:
         delta = np.abs(a[shared] - b[shared])
         intersection = delta < cutoffs[shared]
@@ -76,7 +73,7 @@ def cutoff_tanimoto_similarity(cutoffs, a, b, check_sign=False):
         return 0.
 
 
-def cutoff_tversky22_similarity(cutoffs, a, b, check_sign=False):
+def cutoff_tversky22_similarity(cutoffs, a, b):
     """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
         This method takes two vectors and treats each pair of elments matched
         they differ by less than the supplied cutoff for that index.
@@ -88,9 +85,6 @@ def cutoff_tversky22_similarity(cutoffs, a, b, check_sign=False):
     union = np.logical_or(a != 0, b != 0)
     union_size = np.count_nonzero(union)
     shared = union
-    if check_sign:
-        same_sign = np.sign(a) == np.sign(b)
-        shared = np.logical_and(same_sign, union)
     if union_size > 0:
         delta = np.abs(a[shared] - b[shared])
         intersection = delta < cutoffs[shared]
@@ -102,6 +96,12 @@ def cutoff_tversky22_similarity(cutoffs, a, b, check_sign=False):
 
 def normalize_score(score, mode):
     return 2 / (1 + (score / mode) ** 2) - 1
+
+
+def scale_score_to_pocket_size(nA, nB, nAlign, score):
+    coeff = nAlign / (nA + nB - nAlign)
+    rescaled = coeff * score
+    return rescaled
 
 
 def unique_product(p, q, skip=0):

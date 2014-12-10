@@ -7,6 +7,8 @@ import operator
 
 import numpy as np
 
+from feature.io import metadata
+
 from pocketfeature.algorithms import Indexer
 
 
@@ -31,10 +33,12 @@ def _get_value_columns(values, accepted, cast):
 
 class MatrixValues(OrderedDict):
     """ A cheap attempt at storing sparse matrix information """    
-    def __init__(self, entries=[], indexes=None, value_dims=None, default=None):
+    def __init__(self, entries=[], indexes=None, value_dims=None, 
+                       default=None, metadata=None):
         if indexes is None:
             indexes = []
         self.indexes = indexes 
+        self.metadata = metadata
         super(MatrixValues, self).__init__(entries)
         # Try to guess correct "shape" from first provided key
         if value_dims is None:
@@ -123,12 +127,13 @@ class MatrixValues(OrderedDict):
 
 
 class PassThroughItems(object):
-    def __init__(self, entries=[], indexes=[], dims=2, value_dims=[], dim_refs={}):       
+    def __init__(self, entries=[], indexes=[], dims=2, value_dims=[], dim_refs={}, metadata=None):
         self.dims = dims
         self.indexes = indexes
         self.value_dims = value_dims
         self.dim_refs = dim_refs
         self.entries = entries
+        self.metadata = metadata
 
     def items(self):
         return list(self.entries)
@@ -142,7 +147,15 @@ def load(io, dims=2, delimiter=None,
                      cast=None, 
                      make_key=tuple, 
                      value_dims=None, 
-                     header=False):
+                     header=False,
+                     load_metadata=False):
+    if load_metadata:
+        metadata, io = extract_metadata(io)
+    else:
+        metadata = None
+    if not header and metadata is not None:
+        column_names = metadata.get('COLUMNS')
+
     positions = []
     indexes = [Indexer() for i in range(dims)]
     if header:
