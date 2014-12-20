@@ -248,7 +248,7 @@ class BenchmarkPocketFeatureBackground(Task):
             'dssp_dir': self.params.dssp_dir,
             'ff_cache': self.ff_cache,
             'ptf_cache': self.ptf_cache,
-            'compare': self.params.compare_method
+            'compare': self.params.compare_method,
             'alignment': self.params.alignment_method,
             'scale': self.params.scale_methd,
         }
@@ -318,7 +318,7 @@ class BenchmarkPocketFeatureBackground(Task):
         
 
     def record_scores(self, scores, output, scaled_output):
-        with open(output, 'w') as f, open(scaled_output) 'w' as g:
+        with open(output, 'w') as f, open(scaled_output, 'w') as g:
             for item in scores:
                 key, sizes, values, scaled = item
                 if values is None:
