@@ -7,6 +7,7 @@ import os
 
 from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity, 
+    cutoff_tversky22_similarity,
     Indexer,
     normalize_score,
 )
@@ -25,11 +26,17 @@ class FeatureFileCompare(Task):
     BACKGROUND_FF_DEFAULT = 'background.ff'
     BACKGROUND_COEFF_DEFAULT = 'background.coeffs'
 
+    COMPARISON_METHODS = {
+        'tanimoto': cutoff_tanimoto_similarity,
+        'tversky22': cutoff_tversky22_similarity,
+    }
+
     def run(self):
         params = self.params
         background = backgrounds.load(stats_file=params.background, 
                                       norms_file=params.normalization,
-                                      allowed_pairs=params.allowed_pairs)
+                                      allowed_pairs=params.allowed_pairs,
+                                      compare_function=self.COMPARISON_METHODS[params.method])
         features1 = featurefile.load(params.features1)
         features2 = featurefile.load(params.features2)
         # Compute scores and store directly (no matrix representation)
@@ -76,10 +83,14 @@ class FeatureFileCompare(Task):
                                       type=FileType.compressed('r'),
                                       default=background_coeff,
                                       help='Map of normalization coefficients for residue type pairs [default: %(default)s]')
+        parser.add_argument('-C', '--method', metavar='COMPARISON_METHOD',
+                                      choices=cls.COMPARISON_METHODS.keys(),
+                                      default='tversky22',
+                                      help='Scoring mehtod to use (one of %(choices)s) [default: %(default)s]')
         parser.add_argument('-p', '--allowed-pairs', metavar='PAIR_SET_NAME',
                                       choices=backgrounds.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
                                       default='classes',
-                                      help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
+                                      help='Pair selection method to use (one of: %(choices)s) [default: %(default)s]')
         parser.add_argument('-o', '--output', metavar='VALUES',
                                               type=FileType.compressed('w'),
                                               default=stdout,

@@ -21,7 +21,6 @@ from pocketfeature.io import (
     pdbfile,
     residuefile,
 )
-from pocketfeature.algorithms import scale_score_to_pocket_size
 from pocketfeature.io.backgrounds import NORMALIZED_SCORE
 from pocketfeature.tasks.pocket import (
     create_pocket_around_ligand,
@@ -29,11 +28,8 @@ from pocketfeature.tasks.pocket import (
     focus_structure,
     pick_best_ligand,
 )
-from pocketfeature.tasks.align import (
-    align_scores_greedy,
-    align_scores_munkres,
-    align_scores_only_best,
-)
+from pocketfeature.tasks.align import AlignScores
+from pocketfeature.tasks.compare import FeatureFileCompare
 from pocketfeature.tasks.featurize import (
     featurize_points,
     update_environ_from_namespace,
@@ -45,8 +41,8 @@ from pocketfeature.utils.args import LOG_LEVELS
 from pocketfeature.tasks.core import Task
 
 
-compute_raw_cutoff_similarity = cutoff_tversky22_similarity
-compute_alignment = align_scores_only_best
+#compute_raw_cutoff_similarity = cutoff_tversky22_similarity
+#compute_alignment = align_scores_only_best
 
 
 def load_points(pdb_file,
@@ -171,9 +167,13 @@ class ComparePockets(Task):
 
         log.info("Loading background")
         log.debug("Allowed residue pairs: {0}".format(params.allowed_pairs)) 
+        comparison_method = FeatureFileCompare.COMPARISON_METHODS.get(params.comparison_method)
+        alignment_method = AlignScores.ALIGNMENT_METHODS.get(params.alignment_method)
+        scale_method = AlignScores.SCALE_METHODS.get(params.scale_method)
+
         background = backgrounds.load(stats_file=params.background,
                                       norms_file=params.normalization,
-                                      compare_function=compute_raw_cutoff_similarity,
+                                      compare_function=comparison_method,
                                       allowed_pairs=params.allowed_pairs,
                                       std_threshold=params.std_threshold)
 
@@ -262,17 +262,17 @@ class ComparePockets(Task):
                                             log=log,
                                             log_label='B')
     
-        _numA = len(featurefileA.vectors)
-        _numB = len(featurefileB.vectors)
+        numA = len(featurefileA.vectors)
+        numB = len(featurefileB.vectors)
     
         log.info("Comparing Vectors")
         scores = background.get_comparison_matrix(featurefileA, featurefileB)
-        _num_scores = len(scores)
+        num_scores = len(scores)
         log.info("Scored {0} vectors (out of {1}x{2}={3} total)".format(
-                    _num_scores,
-                    _numA,
-                    _numB,
-                    _numA * _numB))
+                    num_scores,
+                    numA,
+                    numB,
+                    numA * numB))
         if params.raw_scores is not None:
             log.debug("Writing scores")
             matrixvaluesfile.dump(scores, params.raw_scores)
@@ -280,9 +280,12 @@ class ComparePockets(Task):
         normalized = scores.slice_values(NORMALIZED_SCORE)
 
         log.info("Aligning Pockets")
-        alignment = compute_alignment(normalized, cutoff=params.cutoff)
+        alignment = alignment_method(normalized, cutoff=params.cutoff)
+        num_aligned = len(alignment)
+        num_scored_a, num_scored_b = map(len, scores.indexes)
         log.debug("Aligned {0} points".format(len(alignment)))
         total_score = sum(alignment.values())
+        scaled_score = scale_method(num_scored_a, num_scored_b, num_aligned, total_score)
         alignment_with_raw_scores = scores.subset_from_keys(alignment.keys())
         
         if params.alignment is not None:
@@ -291,13 +294,11 @@ class ComparePockets(Task):
             params.alignment.close()
             
         log.info("Alignment Score: {0}".format(total_score))
-        if params.rescale:
-            nAlign = len(alignment.values())
-            total_score = scale_score_to_pocket_size(_numA, _numB, nAlign, total_score)
 
-        print("{0}\t{1}\t{2:0.5f}".format(signature_stringA,
-                                          signature_stringB,
-                                          total_score),
+        print("{0}\t{1}\t{2}\t{3}\t{4:0.5f}\t{5}\t{6:0.05g}"\
+                    .format(signature_stringA, signature_stringB, 
+                            numA, numB, num_aligned,
+                            total_score, scaled_score),
               file=params.output)
 
 
@@ -387,6 +388,18 @@ class ComparePockets(Task):
                                       choices=backgrounds.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
                                       default='classes',
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
+        parser.add_argument('-C', '--comparison-method', metavar='COMPARISON_METHOD',
+                                      choices=FeatureFileCompare.COMPARISON_METHODS.keys(),
+                                      default='tversky22',
+                                      help='Scoring mehtod to use (one of %(choices)s) [default: %(default)s]')
+        parser.add_argument('-A', '--alignment-method', metavar='ALIGN_METHOD',
+                                      choices=AlignScores.ALIGNMENT_METHODS,
+                                      default='onlybest',
+                                      help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
+        parser.add_argument('-S', '--scale-method', metavar='SCALE_METHOD',
+                                      choices=AlignScores.SCALE_METHODS.keys(),
+                                      default='none',
+                                      help="Method to re-scale score based on pocket sizes (one of: %(choices)s) [default: %(default)s]")
         parser.add_argument('-t', '--std-threshold', metavar='NSTD',
                                      type=float,
                                      default=1.0,

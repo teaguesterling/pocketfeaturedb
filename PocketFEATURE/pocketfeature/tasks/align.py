@@ -7,6 +7,9 @@ from pocketfeature.algorithms import (
     greedy_align,
     munkres_align,
     only_best_align,
+    scale_score_to_alignment_evalue,
+    scale_score_to_alignment_tanimoto,
+    scale_score_none,
 )
 from pocketfeature.io import matrixvaluesfile
 from pocketfeature.io.matrixvaluesfile import MatrixValues
@@ -43,15 +46,29 @@ class AlignScores(Task):
         'munkres': align_scores_munkres,
         'onlybest': align_scores_only_best,
     }
+    SCALE_METHODS = {
+        'none': scale_score_none,
+        'tanimoto': scale_score_to_alignment_tanimoto,
+        'evalue': scale_score_to_alignment_evalue,
+    }
 
     def run(self):
         params = self.params
         align = self.ALIGNMENT_METHODS[params.method]
+        scale = self.SCALE_METHODS[params.scale_method]
         columns = [params.score_column]
         scores = matrixvaluesfile.load(params.scores, columns=columns, cast=float)
         alignment = align(scores, params.cutoff)
+        nA, nB = map(len, scores.indexes)
+        num_total_points = len(scores)
+        num_aligned_points = len(alignment)
         matrixvaluesfile.dump(alignment, params.output)
-        print("Score: {0}".format(sum(alignment.values())), file=params.log)
+        raw_score = sum(alignment.values())
+        scaled_score = scale(nA, nB, num_aligned_points, raw_score)
+        print("Points\t{0}".format(num_total_points), file=params.log)
+        print("Aligned\t{0}".format(num_aligned_points), file=params.log)
+        print("Raw\t{0:0.5f}".format(raw_score), file=params.log)
+        print("Scaled\t{0:0.6g}".format(scaled_score), file=params.log)
         return 0
 
     @classmethod
@@ -78,6 +95,10 @@ class AlignScores(Task):
                                       choices=cls.ALIGNMENT_METHODS,
                                       default='onlybest',
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
+        parser.add_argument('-S', '--scale-method', metavar='SCALE_METHOD',
+                                      choices=cls.SCALE_METHODS,
+                                      default='none',
+                                      help="Method to re-scale score based on pocket sizes (one of: %(choices)s) [default: %(default)s]")
         parser.add_argument('-o', '--output', metavar='VALUES',
                                               type=FileType.compressed('w'),
                                               default=stdout,

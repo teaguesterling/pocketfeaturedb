@@ -98,10 +98,22 @@ def normalize_score(score, mode):
     return 2 / (1 + (score / mode) ** 2) - 1
 
 
-def scale_score_to_pocket_size(nA, nB, nAlign, score):
+def scale_score_none(nA, nB, nAlign, score, **params):
+    return score
+
+
+def scale_score_to_alignment_tanimoto(nA, nB, nAlign, score, **params):
     coeff = nAlign / (nA + nB - nAlign)
     rescaled = coeff * score
     return rescaled
+
+
+def scale_score_to_alignment_evalue(nA, nB, nAlign, score, **params):
+    l = params.get('l', 2)
+    k = params.get('k', 1)
+    scale = k * (nA * nB) / nAlign ** 2
+    exp = np.exp(l * score)
+    return scale * exp
 
 
 def unique_product(p, q, skip=0):
