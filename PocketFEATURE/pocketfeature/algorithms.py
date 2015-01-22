@@ -7,6 +7,7 @@ from collections import (
     defaultdict,
     OrderedDict,
 )
+import functools
 import operator
 
 import numpy as np
@@ -14,10 +15,34 @@ from scipy.spatial import distance
 from munkres import Munkres
 
 
+def parameterized_feature_coefficient(fn):
+    def batch_similarity(params, a, bs):
+        return np.array([fn(params, a, b) for b in bs])
+
+    def similarity_matrix(params, as_, bs):
+        return np.array([fn.batch_similarity(params, a, bs) for a in as_])
+
+    def override_batch_similarity(bulk_fn):
+        setattr(fn, 'batch_similarity', bulk_fn)
+        return bulk_fn
+
+    def override_similarity_matrix(matrix_fn):
+        setattr(fn, 'similarity_matrix', matrix_fn)
+        return matrix_fn
+
+    override_batch_similarity(batch_similarity)
+    override_similarity_matrix(similarity_matrix)
+
+    setattr(fn, 'override_batch_similarity', override_batch_similarity)
+    setattr(fn, 'override_similarity_matrix', override_similarity_matrix)
+
+    return fn
+
+
 def cosine_similarity(dummy, a, b):
     return distance.cosine(a, b)
 
-
+@parameterized_feature_coefficient
 def reference_cutoff_tanimoto_similarity(cutoffs, a, b):
     total = 0  # $all -> total
     comm = 0
@@ -33,7 +58,7 @@ def reference_cutoff_tanimoto_similarity(cutoffs, a, b):
     else:
         return comm / (total * 2 - comm)
 
-
+@parameterized_feature_coefficient
 def adjusted_reference_cutoff_tanimoto_similarity(cutoffs, a, b):
     N = len(a)
     total = 0
@@ -51,7 +76,7 @@ def adjusted_reference_cutoff_tanimoto_similarity(cutoffs, a, b):
     else:
         return comm / total
 
-
+@parameterized_feature_coefficient
 def cutoff_tanimoto_similarity(cutoffs, a, b):
     """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
         This method takes two vectors and treats each pair of elments matched
@@ -72,7 +97,7 @@ def cutoff_tanimoto_similarity(cutoffs, a, b):
     else:
         return 0.
 
-
+@parameterized_feature_coefficient
 def cutoff_tversky22_similarity(cutoffs, a, b):
     """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
         This method takes two vectors and treats each pair of elments matched
@@ -92,6 +117,22 @@ def cutoff_tversky22_similarity(cutoffs, a, b):
         return intersection_size / (2 * union_size - intersection_size)
     else:
         return 0.
+
+@cutoff_tversky22_similarity.override_batch_similarity
+def bulk_cutoff_tversky22_similarity(cutoffs, a, bs):
+    n = len(bs)
+    unions = np.logical_or(a !=0, bs != 0)
+    a_repeat = np.repeat(a[np.newaxis], n, axis=0)
+    cutoffs_repeat = np.repeat(cutoffs[np.newaxis], n, axis=0)
+    in_bounds = np.abs(a_repeat - bs) < cutoffs_repeat
+    intersections = np.logical_and(unions, in_bounds)
+    union_sizes = unions.sum(axis=1)
+    intersection_sizes = intersections.sum(axis=1)
+    old_error_settings = np.seterr(divide='ignore')
+    scores = intersection_sizes / (2. * union_sizes - intersection_sizes)
+    scores[~np.isfinite(scores)] = 0.
+    np.seterr(**old_error_settings)
+    return scores
 
 
 def normalize_score(score, mode):
