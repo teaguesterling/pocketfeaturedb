@@ -109,8 +109,10 @@ def scale_score_to_alignment_tanimoto(nA, nB, nAlign, score, **params):
 
 
 def scale_score_to_alignment_evalue(nA, nB, nAlign, score, **params):
-    l = params.get('l', 2)
-    k = params.get('k', 1)
+    if nAlign == 0 or score == 0:
+        return 0.
+    l = params.get('l', 5)
+    k = params.get('k', 10)
     scale = k * (nA * nB) / nAlign ** 2
     exp = np.exp(l * score)
     return scale * exp

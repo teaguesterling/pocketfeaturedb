@@ -88,6 +88,8 @@ foreach $index(@index)
 	foreach $centers(@centers)
 		{
 		my $dis=find_shortest_dis_between_atom_ligands(\@ligandAtoms, $centers);
+                #ADDED!!!
+                print $dis."\t".$tmpIndex;;
 		if ($dis<=$cutoff)
 			{
 			$poiNumber++;
@@ -144,6 +146,8 @@ foreach $ligand(@ligand)
 		push (@disBetweenPointsLigands, $dis);
         }
 my @sorted=sort{$a<=>$b}@disBetweenPointsLigands;
+# ADDED!!!!
+print $sorted;
 return($sorted[0]);
 }
 #----------------------------------------------------------------------------------------#

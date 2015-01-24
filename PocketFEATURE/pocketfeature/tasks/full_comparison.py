@@ -167,9 +167,9 @@ class ComparePockets(Task):
 
         log.info("Loading background")
         log.debug("Allowed residue pairs: {0}".format(params.allowed_pairs)) 
-        comparison_method = FeatureFileCompare.COMPARISON_METHODS.get(params.comparison_method)
-        alignment_method = AlignScores.ALIGNMENT_METHODS.get(params.alignment_method)
-        scale_method = AlignScores.SCALE_METHODS.get(params.scale_method)
+        comparison_method = FeatureFileCompare.COMPARISON_METHODS[params.comparison_method]
+        alignment_method = AlignScores.ALIGNMENT_METHODS[params.alignment_method]
+        scale_method = AlignScores.SCALE_METHODS[params.scale_method]
 
         background = backgrounds.load(stats_file=params.background,
                                       norms_file=params.normalization,
@@ -282,7 +282,10 @@ class ComparePockets(Task):
         log.info("Aligning Pockets")
         alignment = alignment_method(normalized, cutoff=params.cutoff)
         num_aligned = len(alignment)
-        num_scored_a, num_scored_b = map(len, scores.indexes)
+        if len(scores) > 0:
+            num_scored_a, num_scored_b = map(len, scores.indexes)
+        else:
+            num_scored_a, num_scored_b = 0, 0
         log.debug("Aligned {0} points".format(len(alignment)))
         total_score = sum(alignment.values())
         scaled_score = scale_method(num_scored_a, num_scored_b, num_aligned, total_score)
@@ -295,7 +298,7 @@ class ComparePockets(Task):
             
         log.info("Alignment Score: {0}".format(total_score))
 
-        print("{0}\t{1}\t{2}\t{3}\t{4:0.5f}\t{5}\t{6:0.05g}"\
+        print("{0}\t{1}\t{2:d}\t{3:d}\t{4:d}\t{5:0.5f}\t{6:0.05g}"\
                     .format(signature_stringA, signature_stringB, 
                             numA, numB, num_aligned,
                             total_score, scaled_score),

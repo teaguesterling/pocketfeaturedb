@@ -82,6 +82,7 @@ if [ ! -z $1 ]; then
 run_pf data/1qhx.pdb data/1qhx.pdb \
        -b data/background.ff \
        -n data/background.coeffs \
+       --scale-method=evalue \
        --pdb-dir=data \
        --dssp-dir=data \
        --raw-scores=${1}-1.scores \
@@ -90,6 +91,7 @@ run_pf data/1qhx.pdb data/1qhx.pdb \
 run_pf data/1qhx.pdb data/1qrd.pdb \
        -b data/background.ff \
        -n data/background.coeffs \
+       --scale-method=evalue \
        --pymolA=/tmp/1qhx.py \
        --pymolB=/tmp/1qrd.py \
        --pdb-dir=data \
@@ -100,6 +102,7 @@ run_pf data/1qhx.pdb data/1qrd.pdb \
 run_pf data/1qhx.pdb data/1kmi.pdb \
        -b data/background.ff \
        -n data/background.coeffs \
+       --scale-method=evalue \
        --pdb-dir=data \
        --dssp-dir=data \
        --raw-scores=${1}-3.scores \
@@ -108,6 +111,7 @@ run_pf data/1qhx.pdb data/1kmi.pdb \
 run_pf data/1kmi.pdb data/1alu.pdb \
        -b data/background.ff \
        -n data/background.coeffs \
+       --scale-method=evalue \
        --pdb-dir=data \
        --dssp-dir=data \
        --raw-scores=${1}-4.scores \

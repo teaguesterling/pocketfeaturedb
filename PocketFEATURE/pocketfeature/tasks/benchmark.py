@@ -93,25 +93,24 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
         distance=params['distance'],
         check_cached_first=params.get('ff_cache') is not None,
         link_cached=params.get('ff_cache') is not None,
-        comparison_method=params['compare'],
-        alignment_method=params['alignment'],
-        scale_method=params['scale'],
+        comparison_method=params['compare_method'],
+        alignment_method=params['alignment_method'],
+        scale_method=params['scale_method'],
         log_level='error',
         **job_files
     )
+    buf.seek(0)
     key = (pdbidA, pdbidB)
     if task.run() != 0:
         return key, (0, 0, 0), None, None
-
-    buf.seek(0)
-    results = matrixvaluesfile.load(buf, cast=float)
     try:
-        key, results = results.items()[0]
+        results = matrixvaluesfile.load(buf, cast=float)
+        key, scores = results.items()[0]
+        sizes = tuple(map(int, scores[:3]))
     except ValueError:
         return key (0, 0, 0), None, None
-    sizes = map(int, results[:3])
-    raw_score = results[3]
-    scaled_score = results[4]
+    raw_score = scores[3]
+    scaled_score = scores[4]
     for f in job_files.values():
         if hasattr(f, 'close'):
             f.close()
@@ -131,8 +130,8 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
 
         task = AlignScores.from_params(
             cutoff=cutoff,
-            method=params['alignment'],
-            scale_method=params['scale'],
+            method=params['alignment_method'],
+            scale_method=params['scale_method'],
             score_column=1,
             **job_files
         )
@@ -269,9 +268,9 @@ class BenchmarkPocketFeatureBackground(Task):
             'dssp_dir': self.params.dssp_dir,
             'ff_cache': self.ff_cache,
             'ptf_cache': self.ptf_cache,
-            'compare': self.params.compare_method,
-            'alignment': self.params.alignment_method,
-            'scale': self.params.scale_method,
+            'compare_method': self.params.compare_method,
+            'alignment_method': self.params.alignment_method,
+            'scale_method': self.params.scale_method,
         }
         self.failed_scores = 0
         self.successful_scores = 0
@@ -292,8 +291,7 @@ class BenchmarkPocketFeatureBackground(Task):
             all_scores = itertools.imap(_run_pf_comparison_star, all_args)
 
         all_scores = self.record_scores(all_scores, output, output_scaled)
-
-        for idx, (key, sizes, score, scaled) in enumerate(all_scores, start=1):
+        for idx, (key, sizes, scores, scaled) in enumerate(all_scores, start=1):
             print("\r{0} of {1} {2} alignments computed ({3} successful, {4} failed) ({5}) ".format(
                     idx, 
                     num_comps, 
@@ -301,7 +299,7 @@ class BenchmarkPocketFeatureBackground(Task):
                     self.successful_scores,
                     self.failed_scores,
                     ":".join(key)), end="", file=sys.stderr)
-            stats.record(score)
+            stats.record(scores)
             scaled_stats.record(scaled)
         print("", file=sys.stderr)
 
@@ -343,6 +341,8 @@ class BenchmarkPocketFeatureBackground(Task):
         
 
     def record_scores(self, scores, output, scaled_output):
+        if scaled_output is None:
+            scaled_output = os.devnull
         with open(output, 'w') as f, open(scaled_output, 'w') as g:
             for item in scores:
                 if len(item) == 4:
@@ -355,9 +355,11 @@ class BenchmarkPocketFeatureBackground(Task):
                     self.log.debug("Failure to compare {0}".format(":".join(key)))
                 else:
                     self.successful_scores += 1
-                    passthough = PassThroughItems([(key, sizes + values)])
+                    row = tuple(sizes) + tuple(values)
+                    scaled_row = tuple(sizes) + tuple(scaled)
+                    passthough = PassThroughItems([(key, row)])
                     matrixvaluesfile.dump(passthough, f)
-                    passthough = PassThroughItems([(key, sizes + scaled)])
+                    passthough = PassThroughItems([(key, scaled_row)])
                     matrixvaluesfile.dump(passthough, g)
                     yield item
             
@@ -425,9 +427,12 @@ class BenchmarkPocketFeatureBackground(Task):
         parser.add_argument('-A', '--alignment-method', metavar='ALIGNMENT',
                                               default='onlybest',
                                               help='Alignment method to use [default: %(default)s]')
-        parser.add_argument('-S', '--scale-method', metavar='sCALING',
+        parser.add_argument('-C', '--compare-method', metavar='SCORING',
+                                              default='tversky22',
+                                              help='FEATURE vector scoring method to use [default: %(default)s]')
+        parser.add_argument('-S', '--scale-method', metavar='SCALING',
                                               default='none',
-                                              help='Scaling method to use [default: %(default)s]')
+                                              help='Scoring scaling method to use [default: %(default)s]')
         parser.add_argument('-o', '--positives-out', metavar='POSITIVE_OUT',
                                                      default=cls.POS_OUT_DEFAULT,
                                                      help='Positive out scores [default: %(default)s]')
