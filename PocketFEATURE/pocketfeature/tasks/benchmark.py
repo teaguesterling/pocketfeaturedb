@@ -93,20 +93,23 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
         distance=params['distance'],
         check_cached_first=params.get('ff_cache') is not None,
         link_cached=params.get('ff_cache') is not None,
-        compare_method=FeatureFileCompare.COMPARISON_METHODS[params['compare']],
-        align_method=AlignScores.ALIGNMENT_METHODS[params['align']],
-        scale_method=AlignScores.SCALE_METHODS[params['scale']],
+        comparison_method=params['compare'],
+        alignment_method=params['alignment'],
+        scale_method=params['scale'],
         log_level='error',
         **job_files
     )
+    key = (pdbidA, pdbidB)
     if task.run() != 0:
-        return key, None
+        return key, (0, 0, 0), None, None
 
     buf.seek(0)
     results = matrixvaluesfile.load(buf, cast=float)
-    key = results.keys()[0]
-    results = results.values()
-    sizes = tuple(map(int, results[:3]))
+    try:
+        key, results = results.items()[0]
+    except ValueError:
+        return key (0, 0, 0), None, None
+    sizes = map(int, results[:3])
     raw_score = results[3]
     scaled_score = results[4]
     for f in job_files.values():
@@ -139,16 +142,28 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
 
         with open(log_path) as f:
             log_lines = list(f)
-            score = float([l.split('\t')[1] for l in log_lines if l.startswith('Raw\t')][0])
-            scaled = float([l.split('\t')[1] for l in log_lines if l.startswith('Scaled\t')][0])
+            try:
+                score = float([l.split('\t')[1] for l in log_lines if l.startswith('Raw\t')][0])
+            except ValueError:
+                score = float('inf')
+            try:
+                scaled = float([l.split('\t')[1] for l in log_lines if l.startswith('Scaled\t')][0])
+            except ValueError:
+                scaled = float('inf')
             scores.append(score)
             scaled_scores.append(scaled)
 
     return key, sizes, scores, scaled_scores
         
 
-def _run_pf_comparison_star(args):
-    return run_pf_comparison(*args)
+def _run_pf_comparison_star(args, fail=True):
+    try:
+        return run_pf_comparison(*args)
+    except:
+        if fail:
+            raise
+        else:
+            return ('Unknown', 'Unknown'), [], None, None
 
 
 class BenchmarkPocketFeatureBackground(Task):
@@ -194,7 +209,7 @@ class BenchmarkPocketFeatureBackground(Task):
 
         if os.path.exists(params.bench_dir):
             if params.resume:
-                log.waringn("Resuming with feature vectors from BENCH_DIR")
+                log.warning("Resuming with feature vectors from BENCH_DIR")
             else:
                 log.warning("BENCH_DIR is not empty and NOT resuming. Erasing benchmark files")
                 shutil.rmtree(params.bench_dir)
@@ -212,18 +227,23 @@ class BenchmarkPocketFeatureBackground(Task):
         self.positive_stats = self.compare_positives()
         self.control_stats = self.compare_controls()
 
-        ps = self.positive_stats
-        cs = self.control_stats
+        ps, ps_r = self.positive_stats
+        cs, cs_r = self.control_stats
 
         with open(self.params.summary_out, 'w') as f:
             print('class', 'cutoff', 'mean', 'std', 'min', 'max', file=f, sep='\t')
             print('class', 'cutoff', 'mean', 'std', 'min', 'max', sep='\t')
             for c, cutoff in enumerate(self.cutoffs):
                 print('Positive', cutoff, ps.mean[c], ps.std_dev[c], ps.mins[c], ps.maxes[c], sep='\t', file=f)
-                print('Control', cutoff, cs.mean[c], cs.std_dev[c], cs.mins[c], cs.maxes[c], sep='\t', file=f)
+                print('Control ', cutoff, cs.mean[c], cs.std_dev[c], cs.mins[c], cs.maxes[c], sep='\t', file=f)
                 print('Positive', cutoff, ps.mean[c], ps.std_dev[c], ps.mins[c], ps.maxes[c], sep='\t')
-                print('Control', cutoff, cs.mean[c], cs.std_dev[c], cs.mins[c], cs.maxes[c], sep='\t')
+                print('Control ', cutoff, cs.mean[c], cs.std_dev[c], cs.mins[c], cs.maxes[c], sep='\t')
             
+            for c, cutoff in enumerate(self.cutoffs):
+                print('Positive', cutoff, ps_r.mean[c], ps_r.std_dev[c], ps_r.mins[c], ps_r.maxes[c], sep='\t', file=f)
+                print('Control ', cutoff, cs_r.mean[c], cs_r.std_dev[c], cs_r.mins[c], cs_r.maxes[c], sep='\t', file=f)
+                print('Positive', cutoff, ps_r.mean[c], ps_r.std_dev[c], ps_r.mins[c], ps_r.maxes[c], sep='\t')
+                print('Control ', cutoff, cs_r.mean[c], cs_r.std_dev[c], cs_r.mins[c], cs_r.maxes[c], sep='\t')
 
 
     def compare_pdb_pairs(self, pairs, comp_name, output, output_scaled=None, ligA=None, ligB=None):
@@ -234,7 +254,8 @@ class BenchmarkPocketFeatureBackground(Task):
         self.log.info("Starting {0} comparison of {1} pairs".format(comp_name, num_comps))
         stats = GaussianStats()
         scaled_stats = GaussianStats()
-        os.makedirs(comp_dir)
+        if not os.path.exists(comp_dir):
+            os.makedirs(comp_dir)
 
         pf_params = {
             'background': self.params.background,
@@ -250,7 +271,7 @@ class BenchmarkPocketFeatureBackground(Task):
             'ptf_cache': self.ptf_cache,
             'compare': self.params.compare_method,
             'alignment': self.params.alignment_method,
-            'scale': self.params.scale_methd,
+            'scale': self.params.scale_method,
         }
         self.failed_scores = 0
         self.successful_scores = 0
@@ -272,7 +293,7 @@ class BenchmarkPocketFeatureBackground(Task):
 
         all_scores = self.record_scores(all_scores, output, output_scaled)
 
-        for idx, (key, score, scaled) in enumerate(all_scores, start=1):
+        for idx, (key, sizes, score, scaled) in enumerate(all_scores, start=1):
             print("\r{0} of {1} {2} alignments computed ({3} successful, {4} failed) ({5}) ".format(
                     idx, 
                     num_comps, 
@@ -291,14 +312,16 @@ class BenchmarkPocketFeatureBackground(Task):
 
         self.log.info("Finished {0} (Mean score: {1})".format(comp_name, stats.mean))
     
-        return scores, stats
+        return scores, (stats, scaled_stats)
 
     def compare_positives(self):
         positives = get_pdb_files(self.params.positives, pdb_dir=self.params.pdb_dir,
                                                          log=self.log)
         pairs = itertools.combinations_with_replacement(positives, 2)
         output = self.params.positives_out
-        scores, stats = self.compare_pdb_pairs(pairs, 'positives', output,
+        scaled = output + "-scaled"
+        scores, stats = self.compare_pdb_pairs(pairs, 'positives', 
+                                               output, scaled,
                                                ligA=self.params.positive_ligands,
                                                ligB=self.params.positive_ligands)
 
@@ -311,7 +334,9 @@ class BenchmarkPocketFeatureBackground(Task):
                                                        log=self.log)
         pairs = itertools.product(positives, controls)
         output = self.params.controls_out
-        scores, stats = self.compare_pdb_pairs(pairs, 'controls', output,
+        scaled = output + "-scaled"
+        scores, stats = self.compare_pdb_pairs(pairs, 'controls', 
+                                               output, scaled,
                                                ligA=self.params.positive_ligands)
 
         return stats
@@ -320,15 +345,19 @@ class BenchmarkPocketFeatureBackground(Task):
     def record_scores(self, scores, output, scaled_output):
         with open(output, 'w') as f, open(scaled_output, 'w') as g:
             for item in scores:
-                key, sizes, values, scaled = item
+                if len(item) == 4:
+                    key, sizes, values, scaled = item
+                else:
+                    key = 'Unknown', 'Unknown'
+                    values = None
                 if values is None:
                     self.failed_scores += 1
                     self.log.debug("Failure to compare {0}".format(":".join(key)))
                 else:
                     self.successful_scores += 1
-                    passthough = PassThroughItems([(key, sizes, values)])
+                    passthough = PassThroughItems([(key, sizes + values)])
                     matrixvaluesfile.dump(passthough, f)
-                    passthough = PassThroughItems([(key, sizes, scaled)])
+                    passthough = PassThroughItems([(key, sizes + scaled)])
                     matrixvaluesfile.dump(passthough, g)
                     yield item
             
@@ -390,9 +419,15 @@ class BenchmarkPocketFeatureBackground(Task):
         parser.add_argument('-c', '--cutoffs', metavar='CUTOFFS',
                                               default=[.1, .1, 0, -0.1, -0.15, -0.2, -0.25, -0.3],
                                               help='Alignment score thresholds [default: %(default)s]')
+        parser.add_argument('-C', '--compare-method', metavar='COMPARISON',
+                                              default='tversky22',
+                                              help='Comparisoin method to use [default: %(default)s]')
         parser.add_argument('-A', '--alignment-method', metavar='ALIGNMENT',
                                               default='onlybest',
                                               help='Alignment method to use [default: %(default)s]')
+        parser.add_argument('-S', '--scale-method', metavar='sCALING',
+                                              default='none',
+                                              help='Scaling method to use [default: %(default)s]')
         parser.add_argument('-o', '--positives-out', metavar='POSITIVE_OUT',
                                                      default=cls.POS_OUT_DEFAULT,
                                                      help='Positive out scores [default: %(default)s]')
