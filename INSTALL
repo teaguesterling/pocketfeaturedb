@@ -1,4 +1,4 @@
-#!/bin/bash
+!/bin/bash
 #
 # INSTALL PocketFEATURE
 # =====================
@@ -85,6 +85,8 @@ run_pf data/1qhx.pdb data/1qhx.pdb \
        --scale-method=evalue \
        --pdb-dir=data \
        --dssp-dir=data \
+       --ffA=${1}-1-A.ff \
+       --ffB=${1}-1-B.ff \
        --raw-scores=${1}-1.scores \
        --alignment=${1}-1.align
 
