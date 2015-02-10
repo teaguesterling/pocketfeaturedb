@@ -13,6 +13,8 @@ cutoffs = [0.1, 0.1, 0, -0.1, -0.15, -0.2, -0.25, -0.3]
 
 
 def make_all_plots(pos_file, cont_file):
+
+    # Skip counts
     with open(pos_file) as f:
         positives = matrixvaluesfile.load(f, cast=float)
 
@@ -20,8 +22,8 @@ def make_all_plots(pos_file, cont_file):
         controls = matrixvaluesfile.load(f, cast=float)
 
     # Transpose to do cutoff-wise instead of pair-wise
-    all_pos_scores = np.array(positives.values()).transpose()
-    all_cont_scores = np.array(controls.values()).transpose()
+    all_pos_scores = np.array(positives.values())[:,3:].transpose()
+    all_cont_scores = np.array(controls.values())[:,3:].transpose()
 
     for i, cutoff in enumerate(cutoffs):
         pos_scores = all_pos_scores[i]
