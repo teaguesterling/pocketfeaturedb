@@ -1,6 +1,7 @@
 # noinspection PyUnresolvedReferences
 
 from datetime import datetime as dt
+import warnings
 
 from sqlalchemy import (
     Boolean,
@@ -45,33 +46,52 @@ from sqlalchemy.orm.exc import (
     MultipleResultsFound,
 )
 
-from sqlalchemy.dialects.postgresql import (
-    ARRAY,
-    JSON,
-)
+from sqlalchemy.dialects.postgresql import ARRAY
 
 from sqlalchemy_utils.types import (
     ArrowType,
+    ChoiceType,
     IPAddressType,
     JSONType,
     EncryptedType,
 )
 
-from featuredb.extensions.sqla import DynamicBindMixin
-from drake.extensions import db
-
 Null = text('NULL')
 Now = text('NOW()')
 
-BaseModel = db.Model
-Query = db.Query
-Session = db.Session
+FeatureVectorType = ARRAY(Float, as_tuple=True)
+
+try:
+    from geoalchemy2 import Geometry
+    PointType = Geometry(geometry_type='POINT', dimension=3)
+except ImportError:
+    warnings.warn("Geoalchemy not available for Geometry types")
+    PointType = ARRAY(Float, dimensions=3, as_tuple=True)
+
+try:
+    from rdalchemy.rdalchemy import MolType as MolType
+except ImportError:
+    warnings.warn("RDAlchemy not available for molecule types")
+    MolType = String
+
+from featuredb.extensions import db
 
 dynamic_loader = db.dynamic_loader
 event = db.event
 relation = db.relation
 relationship = db.relationship
 Table = db.Table
+
+Model = db.Model
+Query = db.Query
+Session = db.Session
+
+
+class SurrogatePK(object):
+    id = Column('id', Integer, primary_key=True, nullable=False)
+    __table_args__ = {
+        'extend_existing': True,
+    }
 
 
 class ArrowTimestamp(object):
@@ -82,8 +102,6 @@ class ArrowTimestamp(object):
     for all derived declarative models.
 
     ::
-
-
         import sqlalchemy as sa
         from sqlalchemy_utils import Timestamp
 
