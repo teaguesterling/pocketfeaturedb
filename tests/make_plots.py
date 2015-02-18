@@ -20,12 +20,12 @@ def make_all_plots(pos_file, cont_file):
         controls = matrixvaluesfile.load(f, cast=float)
 
     # Transpose to do cutoff-wise instead of pair-wise
-    all_pos_scores = np.array(positives.values()).transpose()
-    all_cont_scores = np.array(controls.values()).transpose()
+    all_pos_scores = np.array(positives.values()).transpose()[3:, :]
+    all_cont_scores = np.array(controls.values()).transpose()[3:, :]
 
     for i, cutoff in enumerate(cutoffs):
-        pos_scores = all_pos_scores[i]
-        cont_scores = all_cont_scores[i]
+        pos_scores = all_pos_scores[i,2:]
+        cont_scores = all_cont_scores[i, 2:]
 
         make_plot(pos_scores, cont_scores, cutoff)
         auc = compute_auc(pos_scores, cont_scores)

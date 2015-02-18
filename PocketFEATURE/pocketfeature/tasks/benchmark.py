@@ -99,16 +99,16 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
         log_level='error',
         **job_files
     )
-    buf.seek(0)
     key = (pdbidA, pdbidB)
     if task.run() != 0:
         return key, (0, 0, 0), None, None
     try:
+        buf.seek(0)
         results = matrixvaluesfile.load(buf, cast=float)
         key, scores = results.items()[0]
         sizes = tuple(map(int, scores[:3]))
-    except ValueError:
-        return key (0, 0, 0), None, None
+    except (ValueError, IndexError):
+        return key, (0, 0, 0), None, None
     raw_score = scores[3]
     scaled_score = scores[4]
     for f in job_files.values():
@@ -427,9 +427,6 @@ class BenchmarkPocketFeatureBackground(Task):
         parser.add_argument('-A', '--alignment-method', metavar='ALIGNMENT',
                                               default='onlybest',
                                               help='Alignment method to use [default: %(default)s]')
-        parser.add_argument('-C', '--compare-method', metavar='SCORING',
-                                              default='tversky22',
-                                              help='FEATURE vector scoring method to use [default: %(default)s]')
         parser.add_argument('-S', '--scale-method', metavar='SCALING',
                                               default='none',
                                               help='Scoring scaling method to use [default: %(default)s]')
