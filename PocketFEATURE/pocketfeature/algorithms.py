@@ -234,7 +234,7 @@ def only_best_align(scores, maximize=False):
     # Order the aligned points by score
     prioritized = sorted(accepted, key=operator.itemgetter(1), reverse=maximize)
 
-    return accepted
+    return prioritized
 
 
 
