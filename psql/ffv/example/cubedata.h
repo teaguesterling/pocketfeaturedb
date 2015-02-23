@@ -1,6 +1,10 @@
-/* contrib/cube/cubedata.h */
+/* derived from contrib/cube/cubedata.h */
 
-#define CUBE_MAX_DIM (100)
+/* TODO: Make this as large as the largest possible FEATURE Vector */
+#define FFV_MAX_SHELLS (15)
+#define FFV_MAX_PROPERTIES (127)
+#define FFV_MAX_DIM (FFV_MAX_SHELLS * FFV_MAX_PROPERTIES)
+
 
 typedef struct NDBOX
 {
@@ -13,11 +17,11 @@ typedef struct NDBOX
 	 *
 	 * Following information is stored:
 	 *
-	 *	bits 0-7  : number of cube dimensions;
-	 *	bits 8-30 : unused, initialize to zero;
-	 *	bit  31   : point flag. If set, the upper right coordinates are not
-	 *				stored, and are implicitly the same as the lower left
-	 *				coordinates.
+	 *	bits 0-3   : number of shells;
+	 #  bits 4-10  : number of properties;
+	 *	bits 11-30 : unused, initialize to zero;
+	 *	bit  31    : normalized flag. If set, vector is understood to be a Z-score
+	                 instead of a raw feature vector
 	 *----------
 	 */
 	unsigned int header;
@@ -30,12 +34,22 @@ typedef struct NDBOX
 	double		x[1];
 } NDBOX;
 
-#define POINT_BIT			0x80000000
-#define DIM_MASK			0x7fffffff
+#define Z_BIT			    0x80000000
+#define SHELL_MASK			0x0000000F
+#define PROPERTY_MASK   	0x00000FF0
+#define DATA_MASK           SHELL_MASK | PROPERTY_MASK
 
-#define IS_POINT(cube)		( ((cube)->header & POINT_BIT) != 0 )
-#define SET_POINT_BIT(cube) ( (cube)->header |= POINT_BIT )
-#define DIM(cube)			( (cube)->header & DIM_MASK )
+#define DEFAULT_FFV_FLAG    80 << 4 + 6
+#define DEFAULT_FFV_SIZE    480
+
+#define IS_Z_SCORE(ffv)		        ( ((ffv)->header & Z_BIT) != 0 )
+#define SET_Z_BIT(ffv)              ( (ffv)->header |= Z_BIT )
+#define SIZE_FLAG(ffv)		        ( (ffv)->header & DATA_MASK )
+#define N_SHELLS(ffv)               ( (ffv)->header & SHELL_MASK )
+#define N_PROPS(ffv)                ( ( (ffv)->header & PROPERTY_MASK ) >> 4 )
+#define SIZE(ffv)                   ( ( (ffv)->header == DEFAULT_FFV_FLAG ) ? DEFAULT_FFV_SIZE : ( N_SHELLS(ffv) * N_PROPS(ffv) ) )
+#define SET_N_SHELLS(ffv, _shells)  ( (ffv)->header = ((ffv)->header & ~SHELL_MASK) | (_shells) )
+#define SET_N_PROPS(ffv, _props)    ( (ffv)->header = ((ffv)->header & ~PROPERTY_MASK) | ((_props) << 4) )
 #define SET_DIM(cube, _dim) ( (cube)->header = ((cube)->header & ~DIM_MASK) | (_dim) )
 
 #define LL_COORD(cube, i) ( (cube)->x[i] )
