@@ -42,12 +42,12 @@ CLASSES = {
     'negative': (('ASP', 0), ('GLU', 0)),
     'polar': (('SER', 0), ('THR', 0), 
               ('ASN', 0), ('GLN', 0), 
-              ('TYR', 1), ('TRP', 1)),
+              ('TYR', 0), ('TRP', 0)),
     'non-polar': (('ALA', 0), ('CYS', 0), 
                   ('GLY', 0), ('ILE', 0), 
                   ('LEU', 0), ('MET', 0), 
                   ('PRO', 0), ('VAL', 0)),
-    'aromatic': (('TYR', 0), ('TRP', 0), ('PHE', 0)),
+    'aromatic': (('TYR', 1), ('TRP', 1), ('PHE', 0)),
 }
 
 

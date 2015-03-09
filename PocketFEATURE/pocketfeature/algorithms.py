@@ -7,6 +7,7 @@ from collections import (
     defaultdict,
     OrderedDict,
 )
+import functools
 import operator
 
 import numpy as np
@@ -14,10 +15,43 @@ from scipy.spatial import distance
 from munkres import Munkres
 
 
-def cosine_similarity(dummy, a, b):
-    return distance.cosine(a, b)
+def parameterized_feature_coefficient(fn):
+    def batch_similarity(params, a, bs):
+        return np.array([fn(params, a, b) for b in bs])
+
+    def similarity_matrix(params, as_, bs):
+        return np.array([fn.batch_similarity(params, a, bs) for a in as_])
+
+    def stream_batch_similarities(params, as_, bs):
+        for a in as_:
+            yield fn.batch_similarity(params, a, bs)
+
+    def stream_similarities(params, as_, bs):
+        batches = fn.stream_batch_similarities(params, as_, bs)
+        for batch in batches:
+            for score in batch:
+                yield score
+
+    def override_batch_similarity(bulk_fn):
+        setattr(fn, 'batch_similarity', bulk_fn)
+        return bulk_fn
+
+    def override_similarity_matrix(matrix_fn):
+        setattr(fn, 'similarity_matrix', matrix_fn)
+        return matrix_fn
+
+    override_batch_similarity(batch_similarity)
+    override_similarity_matrix(similarity_matrix)
+
+    setattr(fn, 'override_batch_similarity', override_batch_similarity)
+    setattr(fn, 'override_similarity_matrix', override_similarity_matrix)
+    setattr(fn, 'stream_batch_similarities', stream_batch_similarities)
+    setattr(fn, 'stream_similarities', stream_similarities)
+
+    return fn
 
 
+@parameterized_feature_coefficient
 def reference_cutoff_tanimoto_similarity(cutoffs, a, b):
     total = 0  # $all -> total
     comm = 0
@@ -34,6 +68,7 @@ def reference_cutoff_tanimoto_similarity(cutoffs, a, b):
         return comm / (total * 2 - comm)
 
 
+@parameterized_feature_coefficient
 def adjusted_reference_cutoff_tanimoto_similarity(cutoffs, a, b):
     N = len(a)
     total = 0
@@ -52,6 +87,7 @@ def adjusted_reference_cutoff_tanimoto_similarity(cutoffs, a, b):
         return comm / total
 
 
+@parameterized_feature_coefficient
 def cutoff_tanimoto_similarity(cutoffs, a, b):
     """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
         This method takes two vectors and treats each pair of elments matched
@@ -73,6 +109,24 @@ def cutoff_tanimoto_similarity(cutoffs, a, b):
         return 0.
 
 
+@cutoff_tanimoto_similarity.override_batch_similarity
+def bulk_cutoff_tanimoto_similarity(cutoffs, a, bs):
+    n = len(bs)
+    unions = np.logical_or(a !=0, bs != 0)
+    a_repeat = np.repeat(a[np.newaxis], n, axis=0)
+    cutoffs_repeat = np.repeat(cutoffs[np.newaxis], n, axis=0)
+    in_bounds = np.abs(a_repeat - bs) < cutoffs_repeat
+    intersections = np.logical_and(unions, in_bounds)
+    union_sizes = unions.sum(axis=1)
+    intersection_sizes = intersections.sum(axis=1)
+    old_error_settings = np.seterr(divide='ignore')
+    scores = intersection_sizes / union_sizes
+    scores[~np.isfinite(scores)] = 0.
+    np.seterr(**old_error_settings)
+    return scores
+
+
+@parameterized_feature_coefficient
 def cutoff_tversky22_similarity(cutoffs, a, b):
     """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
         This method takes two vectors and treats each pair of elments matched
@@ -92,6 +146,23 @@ def cutoff_tversky22_similarity(cutoffs, a, b):
         return intersection_size / (2 * union_size - intersection_size)
     else:
         return 0.
+
+
+@cutoff_tversky22_similarity.override_batch_similarity
+def bulk_cutoff_tversky22_similarity(cutoffs, a, bs):
+    n = len(bs)
+    unions = np.logical_or(a !=0, bs != 0)
+    a_repeat = np.repeat(a[np.newaxis], n, axis=0)
+    cutoffs_repeat = np.repeat(cutoffs[np.newaxis], n, axis=0)
+    in_bounds = np.abs(a_repeat - bs) < cutoffs_repeat
+    intersections = np.logical_and(unions, in_bounds)
+    union_sizes = unions.sum(axis=1)
+    intersection_sizes = intersections.sum(axis=1)
+    old_error_settings = np.seterr(divide='ignore')
+    scores = intersection_sizes / (2. * union_sizes - intersection_sizes)
+    scores[~np.isfinite(scores)] = 0.
+    np.seterr(**old_error_settings)
+    return scores
 
 
 def normalize_score(score, mode):
@@ -165,8 +236,8 @@ def greedy_align(scores, maximize=False):
     chosen_keys = defaultdict(set)
     ordered_items = sorted(scores.items(), key=operator.itemgetter(1), reverse=maximize)
     for keys, value in ordered_items:
-	# Make sure we only check that a key has been chosen from a given item
-	indexed_keys = list(enumerate(keys))
+        # Make sure we only check that a key has been chosen from a given item
+        indexed_keys = list(enumerate(keys))
         if all(key not in chosen_keys[idx] for idx, key in indexed_keys):
             for idx, key in indexed_keys:
                 chosen_keys[idx].add(key)
@@ -178,7 +249,7 @@ def only_best_align(scores, maximize=False):
     # Determine functions/defaults
     if maximize:
         default = None, -np.inf
-        is_getter = operator.gt
+        is_better = operator.gt
     else:
         default = None, np.inf
         is_better = operator.lt
@@ -207,7 +278,7 @@ def only_best_align(scores, maximize=False):
     # Order the aligned points by score
     prioritized = sorted(accepted, key=operator.itemgetter(1), reverse=maximize)
 
-    return accepted
+    return prioritized
 
 
 
@@ -362,12 +433,16 @@ class GaussianStats(object):
         return np.sqrt(self.pop_variance)
 
     @property
-    def mode(self):
+    def sample_mode(self):
         mode = self.get_top_n_modes(1)
         if mode is not None:
             return mode[0][0]
         else:
             return None
+
+    @property
+    def mode(self):
+        return self.sample_mode
 
     @property
     def mode_count(self):
@@ -384,6 +459,80 @@ class GaussianStats(object):
     @property
     def maxes(self):
         return self._maxes
+
+
+class SkewGaussianStatistics(GaussianStatistics):
+    def __init__(self, **kwargs):
+        m3 = kwargs.pop('m3', None)
+        super(SkewGaussianStatistics, self).__init__(**kwargs)
+        self._m3 = m3
+
+    def reset(self, **kwargs):
+        m3 = kwargs.pop('m3', None)
+        if m3 is None:
+            m3 = np.zeros(1)
+        super(SkewGaussianStatistics, self).reset(**kwargs)
+        self._m3 = np.array(m3)
+
+    def record(self, item):
+        sample = np.array(item)
+
+        n = self.n + 1
+        delta = sample - self._mean
+        delta_n = delta / n
+        delta_n2 = delta_n ** 2
+        term1 = delta * delta_n * self._n
+        mean = self._mean + delta_n
+        m2 = self._m2 + term1
+        m3 = self._m3 + term1 * delta_n (n - 2) - 3 * delta_n * self._m2
+        mins = np.minimum(self._mins, sample)
+        maxes = np.maximum(self._maxes, sample)
+
+        if self._mode_counts is not None:
+            bin = self._bin_for_mode(item)
+            self._mode_counts[bin] += 1
+
+        self._n = n
+        self._mean = mean
+        self._m2 = m2
+        self._m3 = m3
+        self._mins = mins
+        self._maxes = maxes
+
+        self.store(item)
+
+        return item
+
+    @property
+    def skew(self):
+        return (np.sqrt(n) * self._m3) / (self._m2 ** 3/2.)
+
+    @property
+    def skew_delta(self):
+        sign = np.sign(self._m3)
+        gamma = abs(self.skew)**(2/3)
+        denom = gamma + ((4-np.pi) / 2) ** (2/3)
+        abs_delta = np.sqrt((np.pi / 2) * (gamma / demon))
+        delta = sign * abs_delta
+        return delta
+
+    @property
+    def skew_shape(self):
+        delta = self.skew_delta
+        alpha = delta / np.sqrt(1 - delta**2)
+        return alpha
+
+    @property
+    def skew_mean(self):
+        return self.mean + self.std_dev * self.skew_delta * np.sqrt(2 / np.pi)
+
+    @property
+    def skew_variance(self):
+        return self.variance ** 2 * (1 - (2 * self.skew_delta ** 2 / np.pi))
+
+    @property
+    def mode(self):
+        return self.skew_mean
 
 
 class Indexer(defaultdict):

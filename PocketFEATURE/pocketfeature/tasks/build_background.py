@@ -34,6 +34,7 @@ from pocketfeature.io import (
     pdbfile,
     matrixvaluesfile,
 )
+from pocketfeature.io.backgrounds import ALLOWED_SIMILARITY_METRICS
 from pocketfeature.io.matrixvaluesfile import (
     MatrixValues,
     PassThroughItems,
@@ -58,7 +59,7 @@ NUM_DIGITS_FOR_MODE = 3
 BG_COEFFS_COLUMNS = ('mode', 'mean', 'std_dev', 'n', 'min', 'max')
 
 
-compute_raw_cutoff_similarity = cutoff_tversky22_similarity
+default_raw_cutoff_similarity = cutoff_tversky22_similarity
 
 
 @contextlib.contextmanager
@@ -127,7 +128,7 @@ def _pocket_from_pocket_def_star(args):
 
 def parse_pocket_def_line(line):
     tokens = line.split()
-    pdbid = tokens[0]
+    pdbid = tokens[0].upper()
     lig_data = None
 
     # TODO: Clean this up. Create a pocket def file format
@@ -138,27 +139,30 @@ def parse_pocket_def_line(line):
 
         lig_info = tokens[1]
         lig_info = lig_info.split('#')[0]  # Remove comments/counds
-        lig_info = lig_info.split('_', 2)  # Only split twice incase ligand
+        lig_info = lig_info.split('/')  # Only split twice incase ligand
                                            # ID contains an _
+        lig_info.extend(tokens[2:])
         # XXX: Delimiter should be something other than an _, / would be good
 
         n_lig_fields = len(lig_info)
         
         if n_lig_fields > 0:
-            chainid = lig_info[0]
+            ligid = lig_info[0]
+            if len(ligid) < 3:
+                ligid += "_" * (3 - len(ligid))
+            elif len(ligid) > 3:
+                raise ValueError("Ligand ID must be 3 characters: {0}".format(ligid))
+        if n_lig_fields > 1:
+            chainid = lig_info[1]
             if len(chainid) > 1:
                 raise ValueError("Chain ID {0} is longer than 1 character".format(chainid))
-        if n_lig_fields > 1:
+        if n_lig_fields > 2:
             try:
-                resid = int(lig_info[1])
+                resid = int(lig_info[2])
             except ValueError as e:
                 raise ValueError("Residue ID must be integer: {0}".format(str(e)))
             if resid == 0:
                 resid = None
-        if n_lig_fields > 2:
-            ligid = lig_info[2]
-            if len(ligid) != 3:
-                raise ValueError("Ligand ID must be 3 characters: {0}".format(ligid))
 
         lig_data = (chainid, resid, ligid)
     
@@ -227,24 +231,30 @@ def _featurize_point_stream_star(args):
     return featurize_point_stream(*args)
 
 
-def calculate_residue_pair_normalization(key, thresholds, fileA, fileB, storeFile=None):
+def calculate_residue_pair_normalization(key, thresholds, fileA, fileB, storeFile=None, compare_method=None):
+    compute_raw_cutoff_similarity = ALLOWED_SIMILARITY_METRICS.get(compare_method, default_raw_cutoff_similarity)
     with gzip.open(fileA) as ioA, \
          gzip.open(fileB) as ioB, \
          maybe_open(storeFile, 'w', gzip.open) as ioStore:
         stats = GaussianStats(store=ioStore, mode_binning=NUM_DIGITS_FOR_MODE)
         ffA = featurefile.load(ioA)
         ffB = featurefile.load(ioB)
-        if fileA == fileB:
-            # TODO: Should we really be special-casing A==B to ensure we don't
-            #       compare each pair twice or compare the identity
-            pairs = unique_product(ffA.vectors, ffB.vectors, skip=1)
+        #if fileA == fileB:
+        #    # TODO: Should we really be special-casing A==B to ensure we don't
+        #    #       compare each pair twice or compare the identity
+        #    pairs = unique_product(ffA.features, ffB.vectors, skip=1)
+        #else:
+        #    pairs = itertools.product(ffA.features, ffB.features)
+        if hasattr(compute_raw_cutoff_similarity, 'stream_similarities'):
+            logging.info("Optimized similarlity")
+            raw_scores = compute_raw_cutoff_similarity.stream_similarities(thresholds, ffA.features, ffB.features)
+            for raw_score in raw_scores:
+                stats.record(raw_score)
         else:
-            pairs = itertools.product(ffA.vectors, ffB.vectors)
-        for vectorA, vectorB in pairs:
-            a = vectorA.features
-            b = vectorB.features
-            raw_score = compute_raw_cutoff_similarity(thresholds, a, b)
-            stats.record(raw_score)
+            pairs = itertools.product(ffA.features, ffB.features)
+            for a, b in pairs:
+                raw_score = compute_raw_cutoff_similarity(thresholds, a, b)
+                stats.record(raw_score)
 
     if stats.n > 0:
         mode = float(stats.mode)
@@ -392,7 +402,7 @@ class GeneratePocketFeatureBackground(Task):
         pairs, resumed = self.get_allowed_ff_pairs()
         statsFiles = self.get_ff_pair_scores_files(pairs)
         num_pairs = len(pairs)
-        all_args = ((key, thresholds, fA, fB, statsFiles[key]) 
+        all_args = ((key, thresholds, fA, fB, statsFiles[key], params.compare_method) 
                            for key, (fA, fB) in pairs.items())
 
         if self.params.resume:
@@ -756,6 +766,9 @@ class GeneratePocketFeatureBackground(Task):
                                             type=int,
                                             default=None,
                                             help='Limit the number of points to include')
+        parser.add_argument('-C', '--compare-method', metavar='COMPARISON',
+                                              default='tversky22',
+                                              help='Comparisoin method to use [default: %(default)s]')
         parser.add_argument('-P', '--num-processors', metavar='PROCS',
                                                       default=1,
                                                       type=int,

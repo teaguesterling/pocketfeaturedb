@@ -100,7 +100,11 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
         **job_files
     )
     key = (pdbidA, pdbidB)
-    if task.run() != 0:
+    try: 
+        retcode = task.run()
+    except Exception as e:
+        retcode = 255
+    if retcode != 0:
         return key, (0, 0, 0), None, None
     try:
         buf.seek(0)
