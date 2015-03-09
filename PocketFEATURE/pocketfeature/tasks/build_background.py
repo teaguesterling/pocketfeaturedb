@@ -25,7 +25,7 @@ from feature.io.locate_files import (
 from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity,
     cutoff_tversky22_similarity,
-    GaussianStats,
+    SkewedGaussianStats,
     unique_product,
 )
 from pocketfeature.io import (
