@@ -22,7 +22,7 @@ def _set_default_query_class_to(d, query_cls=BaseQuery):
         d['query_class'] = query_cls
 
 
-def _wrap_with_query_class(fn):
+def _wrap_with_query_class(fn, query_cls=BaseQuery):
     @functools.wraps(fn)
     def newfn(*args, **kwargs):
         _set_default_query_class_to(kwargs)

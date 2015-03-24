@@ -25,7 +25,8 @@ from feature.io.locate_files import (
 from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity,
     cutoff_tversky22_similarity,
-    SkewedGaussianStats,
+    GaussianStats,
+    SkewGaussianStats,
     unique_product,
 )
 from pocketfeature.io import (
@@ -236,7 +237,7 @@ def calculate_residue_pair_normalization(key, thresholds, fileA, fileB, storeFil
     with gzip.open(fileA) as ioA, \
          gzip.open(fileB) as ioB, \
          maybe_open(storeFile, 'w', gzip.open) as ioStore:
-        stats = GaussianStats(store=ioStore, mode_binning=NUM_DIGITS_FOR_MODE)
+        stats = SkewGaussianStats(store=ioStore, mode_binning=NUM_DIGITS_FOR_MODE)
         ffA = featurefile.load(ioA)
         ffB = featurefile.load(ioB)
         #if fileA == fileB:

@@ -1,7 +1,10 @@
 # noinspection PyUnresolvedReferences
+from __future__ import absolute_import
 
 from datetime import datetime as dt
 import warnings
+
+import numpy as np
 
 from sqlalchemy import (
     Boolean,
@@ -28,25 +31,35 @@ from sqlalchemy.sql import (
     or_,
 )
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.ext.hybrid import (
     Comparator,
     hybrid_property,
     hybrid_method,
 )
+from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import (
     backref,
+    column_property,
     foreign,
     join,
     mapper,
     remote,
 )
+from sqlalchemy.orm.collections import attribute_mapped_collection
 from sqlalchemy.orm.exc import (
     NoResultFound,
     MultipleResultsFound,
 )
 
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import (
+    ARRAY,
+    array,
+    HSTORE,
+    hstore,
+)
+from sqlalchemy.sql.elements import NULL
 
 from sqlalchemy_utils.types import (
     ArrowType,
@@ -56,10 +69,62 @@ from sqlalchemy_utils.types import (
     EncryptedType,
 )
 
-Null = text('NULL')
+from ..compat import (
+    binary_type,
+    text_type,
+)
+
+
 Now = text('NOW()')
 
-FeatureVectorType = ARRAY(Float, as_tuple=True)
+
+class CollectionArray(ARRAY):
+    def __init__(self, item_type,
+                 collection_type=list,
+                 dimensions=None,
+                 zero_indexes=False):
+        super(CollectionArray, self).__init__(item_type,
+                                              as_tuple=True,
+                                              dimensions=dimensions,
+                                              zero_indexes=zero_indexes)
+        self.collection_type = collection_type
+
+    @property
+    def python_type(self):
+        if isinstance(self.collection_type, type):
+            return self.collection_type
+        elif self.as_tuple:
+            return tuple
+        else:
+            return list
+
+    def _proc_array(self, arr, itemproc, dim, collection):
+        processed = super(CollectionArray, self)._proc_array(arr, itemproc, dim, collection)
+        if dim is None:
+            return collection(processed)
+        else:
+            return processed
+
+    def result_processor(self, dialect, coltype):
+        item_proc = self.item_type.\
+            dialect_impl(dialect).\
+            result_processor(dialect, coltype)
+
+        def process(value):
+            if value is None:
+                return value
+            else:
+                return self._proc_array(
+                    value,
+                    item_proc,
+                    self.dimensions,
+                    self.collection_type)
+        return process
+
+
+FeatureVectorType = CollectionArray(Float,
+                                    collection_type=np.array,
+                                    zero_indexes=True)
 
 try:
     from geoalchemy2 import Geometry
@@ -75,6 +140,8 @@ except ImportError:
     MolType = String
 
 from featuredb.extensions import db
+
+
 
 dynamic_loader = db.dynamic_loader
 event = db.event

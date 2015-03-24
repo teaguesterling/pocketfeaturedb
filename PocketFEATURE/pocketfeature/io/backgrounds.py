@@ -86,7 +86,7 @@ class BackgroundEnvironment(object):
         self._normalize_fn = normalize_function
         self._scale_fn = scale_function
         if isinstance(allowed_pairs, basestring):
-            allowed_pairs = ALLOWED_VECTOR_TYPE_PAIRS[allowed_pairs]
+            allowed_pairs = ALLOWED_VECTOR_TYPE_PAIRS[allowed_pairs] 
         self._allowed_pairs = allowed_pairs
         self._std_threshold_scale = std_threshold
         self._thresholds = None

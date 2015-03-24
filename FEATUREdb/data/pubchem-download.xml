@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!DOCTYPE PCT-Data PUBLIC "-//NCBI//NCBI PCTools/EN" "http://pubchem.ncbi.nlm.nih.gov/pug/pug.dtd">
+<PCT-Data>
+  <PCT-Data_input>
+    <PCT-InputData>
+      <PCT-InputData_download>
+        <PCT-Download>
+          <PCT-Download_uids>
+            <PCT-QueryUids>
+              <PCT-QueryUids_entrez>
+                <PCT-Entrez>
+                  <PCT-Entrez_db>pccompound</PCT-Entrez_db>
+                  <PCT-Entrez_query-key>5</PCT-Entrez_query-key>
+                  <PCT-Entrez_webenv>1fQnjUEaIJOK6wACVO9gvunif7LLwm5wcP7TgwNenn6QbbtvQ0vzdGdpd6IUs6VSstj2C_ZoTKgOAGamXaOFGy8ovGxze6YXlO_@8A1A5C8C490F1BC1_0088SID</PCT-Entrez_webenv>
+                </PCT-Entrez>
+              </PCT-QueryUids_entrez>
+            </PCT-QueryUids>
+          </PCT-Download_uids>
+          <PCT-Download_format value="sdf"/>
+          <PCT-Download_compression value="gzip"/>
+          <PCT-Download_use-3d value="false"/>
+        </PCT-Download>
+      </PCT-InputData_download>
+    </PCT-InputData>
+  </PCT-Data_input>
+</PCT-Data>

@@ -461,30 +461,31 @@ class GaussianStats(object):
         return self._maxes
 
 
-class SkewGaussianStatistics(GaussianStatistics):
+class SkewGaussianStats(GaussianStats):
     def __init__(self, **kwargs):
         m3 = kwargs.pop('m3', None)
-        super(SkewGaussianStatistics, self).__init__(**kwargs)
-        self._m3 = m3
+        super(SkewGaussianStats, self).__init__(**kwargs)
+        if m3 is not None:
+            self._m3 = np.array(m3)
 
     def reset(self, **kwargs):
         m3 = kwargs.pop('m3', None)
         if m3 is None:
             m3 = np.zeros(1)
-        super(SkewGaussianStatistics, self).reset(**kwargs)
+        super(SkewGaussianStats, self).reset(**kwargs)
         self._m3 = np.array(m3)
 
     def record(self, item):
         sample = np.array(item)
 
-        n = self.n + 1
+        n = self._n + 1
         delta = sample - self._mean
         delta_n = delta / n
         delta_n2 = delta_n ** 2
         term1 = delta * delta_n * self._n
         mean = self._mean + delta_n
         m2 = self._m2 + term1
-        m3 = self._m3 + term1 * delta_n (n - 2) - 3 * delta_n * self._m2
+        m3 = self._m3 + term1 * delta_n * (n - 2) - 3 * delta_n * self._m2
         mins = np.minimum(self._mins, sample)
         maxes = np.maximum(self._maxes, sample)
 
@@ -505,14 +506,14 @@ class SkewGaussianStatistics(GaussianStatistics):
 
     @property
     def skew(self):
-        return (np.sqrt(n) * self._m3) / (self._m2 ** 3/2.)
+        return (np.sqrt(self._n) * self._m3) / (self._m2 ** 3/2.)
 
     @property
     def skew_delta(self):
         sign = np.sign(self._m3)
         gamma = abs(self.skew)**(2/3)
-        denom = gamma + ((4-np.pi) / 2) ** (2/3)
-        abs_delta = np.sqrt((np.pi / 2) * (gamma / demon))
+        denom = gamma + ((4 - np.pi) / 2) ** (2/3)
+        abs_delta = np.sqrt((np.pi / 2) * (gamma / denom))
         delta = sign * abs_delta
         return delta
 

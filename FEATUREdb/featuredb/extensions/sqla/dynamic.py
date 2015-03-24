@@ -95,7 +95,7 @@ class DynamicSQLAlchemy(PluggableSQLAlchemy):
             dynamic = None
         with self._engine_lock:
             state = get_state(app)
-            connectors = connectors = state.connectors
+            connectors = state.connectors
             if dynamic:
                 dynamic_key = dynamic.get_key()
                 if dynamic_key:
