@@ -298,9 +298,9 @@ class ComparePockets(Task):
             
         log.info("Alignment Score: {0}".format(total_score))
 
-        print("{0}\t{1}\t{2:d}\t{3:d}\t{4:d}\t{5:0.5f}\t{6:0.05g}"\
+        print("{0}\t{1}\t{2:d}\t{3:d}\t{4:d}\t{5:d}\t{6:0.5f}\t{7:0.05g}"\
                     .format(signature_stringA, signature_stringB, 
-                            numA, numB, num_aligned,
+                            numA, numB, num_scores, num_aligned,
                             total_score, scaled_score),
               file=params.output)
 
