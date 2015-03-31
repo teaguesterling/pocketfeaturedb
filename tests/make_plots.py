@@ -9,10 +9,11 @@ from sklearn.metrics import roc_auc_score
 from pocketfeature.io import matrixvaluesfile
 from pocketfeature.algorithms import GaussianStats
 
-cutoffs = [0.1, 0.1, 0, -0.1, -0.15, -0.2, -0.25, -0.3]
+DEFAULT_CUTOFFS = [0.1, 0.1, 0, -0.1, -0.15, -0.2, -0.25, -0.3]
 
 
-def make_all_plots(pos_file, cont_file):
+def make_all_plots(pos_file, cont_file, cutoffs=None):
+    cutoffs = map(float, cutoffs.split(',')) if cutoffs else DEFAULT_CUTOFFS
     with open(pos_file) as f:
         positives = matrixvaluesfile.load(f, cast=float)
 
@@ -24,8 +25,8 @@ def make_all_plots(pos_file, cont_file):
     all_cont_scores = np.array(controls.values()).transpose()
 
     # Remove alignment sizes
-    all_pos_scores = all_pos_scores[3:, :]
-    all_cont_scores = all_cont_scores[3:, :]
+    all_pos_scores = all_pos_scores[4:, :]
+    all_cont_scores = all_cont_scores[4:, :]
 
     for i, cutoff in enumerate(cutoffs):
         pos_scores = all_pos_scores[i,:]

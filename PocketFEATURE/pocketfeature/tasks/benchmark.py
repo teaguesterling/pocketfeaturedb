@@ -105,22 +105,21 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
     except Exception as e:
         retcode = 255
     if retcode != 0:
-        return key, (0, 0, 0), None, None
+        return key, (0, 0, 0, 0), None, None
     try:
         buf.seek(0)
         results = matrixvaluesfile.load(buf, cast=float)
-        key, scores = results.items()[0]
-        sizes = tuple(map(int, scores[:3]))
+        key, values = results.items()[0]
+        sizes = tuple(map(int, values[:4]))
+        all_scores = map(float, values[4:6])
+        scores = all_scores[:1]
+        scaled_scores = all_scores[1:2]
     except (ValueError, IndexError):
-        return key, (0, 0, 0), None, None
-    raw_score = scores[3]
-    scaled_score = scores[4]
+        return key, (0, 0, 0, 0), None, None
     for f in job_files.values():
         if hasattr(f, 'close'):
             f.close()
 
-    scores = [raw_score]
-    scaled_scores = [scaled_score]
     scores_file = os.path.join(comp_dir, token + ".scores")
     for cutoff in cutoffs:
         cutoff_token = token + '_{0}'.format(cutoff)
@@ -423,7 +422,7 @@ class BenchmarkPocketFeatureBackground(Task):
                                               default=cls.LIGAND_RESIDUE_DISTANCE,
                                               help='Residue active site distance threshold [default: %(default)s]')
         parser.add_argument('-c', '--cutoffs', metavar='CUTOFFS',
-                                              default=[.1, .1, 0, -0.1, -0.15, -0.2, -0.25, -0.3],
+                                              default=[float('+inf'),.1,0,-0.1,-0.15,-0.2,-0.25,-0.3],
                                               help='Alignment score thresholds [default: %(default)s]')
         parser.add_argument('-C', '--compare-method', metavar='COMPARISON',
                                               default='tversky22',

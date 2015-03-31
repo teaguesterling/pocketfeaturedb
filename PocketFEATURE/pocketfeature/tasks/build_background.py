@@ -237,7 +237,7 @@ def calculate_residue_pair_normalization(key, thresholds, fileA, fileB, storeFil
     with gzip.open(fileA) as ioA, \
          gzip.open(fileB) as ioB, \
          maybe_open(storeFile, 'w', gzip.open) as ioStore:
-        stats = SkewGaussianStats(store=ioStore, mode_binning=NUM_DIGITS_FOR_MODE)
+        stats = GaussianStats(store=ioStore, mode_binning=NUM_DIGITS_FOR_MODE)
         ffA = featurefile.load(ioA)
         ffB = featurefile.load(ioB)
         #if fileA == fileB:

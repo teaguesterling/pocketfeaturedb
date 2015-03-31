@@ -306,12 +306,13 @@ class ComparePockets(Task):
 
 
         
-        log.info("Creating PyMol scripts")
-        scriptA, scriptB = create_alignment_visualizations(pointsA, 
-                                                           pointsB, 
-                                                           alignment,
-                                                           pdbA=params.pdbA.name,
-                                                           pdbB=params.pdbB.name)
+        if params.pymolA is not None or params.pymolB is not None:
+            log.info("Creating PyMol scripts")
+            scriptA, scriptB = create_alignment_visualizations(pointsA,
+                                                               pointsB,
+                                                               alignment,
+                                                               pdbA=params.pdbA.name,
+                                                               pdbB=params.pdbB.name)
 
         if params.pymolA is not None:
             log.debug("Writing first PyMol script") 
