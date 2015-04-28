@@ -68,13 +68,21 @@ def create_alignment_visualizations(pointsA, pointsB, alignment, pdbA=None,
         ligandA = ligand_to_pymol_selector(pointMapA.keys()[0])
         ligandB = ligand_to_pymol_selector(pointMapB.keys()[0])
 
+        if len(alignment) > 0:
+             alignedKeysA, alignedKeysB = zip(*alignment.keys())
+        else:
+             alignedKeysA = alignedKeysB = ()
+        alignedA = [pointMapA[key] for key in alignedKeysA]
+        alignedB = [pointMapB[key] for key in alignedKeysB]
+
         scores = alignment.values()
         scores = [-score for score in scores]  # Lowest are stronger
-        if radii is None:
+        if radii is None or isinstance(radii, float):
+            scale = radii or 5
             if len(scores) > 0:
                 minScore, maxScore = min(scores), max(scores)
                 maxScore = max(maxScore, 1)  # prevent divide by zero
-                radii = [score/(maxScore) for score in scores]
+                radii = [abs(scale*(score/maxScore)) for score in scores]
             else:
                 radii = []
         else:
@@ -90,8 +98,8 @@ def create_alignment_visualizations(pointsA, pointsB, alignment, pdbA=None,
         pdbA = "{0}.pdb".format(pointsA[0].pdbid) if pdbA is None else pdbA
         pdbB = "{0}.pdb".format(pointsB[0].pdbid) if pdbA is None else pdbB
         
-        scriptA = render_pymol_python(pdbA, pointsA, radii, colors, ligandA)
-        scriptB = render_pymol_python(pdbB, pointsB, radii, colors, ligandB)
+        scriptA = render_pymol_python(pdbA, alignedA, radii, colors, ligandA)
+        scriptB = render_pymol_python(pdbB, alignedB, radii, colors, ligandB)
 
         return scriptA, scriptB 
 
@@ -104,7 +112,10 @@ def create_single_visualization(pointsA, pdbA=None,
         ligandA = ligand_to_pymol_selector(pointMapA.keys()[0])
 
         if radii is None:
-            radii = [1.25 for score in pointsA]
+            radii = 5
+        
+        if isinstance(radii, float):
+            radii = [radii for _ in pointsA]
         else:
             radii = list(radii)
 
@@ -147,6 +158,8 @@ class VisAlign(Task):
 
         if params.radii is not None:
             radii = [float(l) for l in params.raii]
+        elif params.radius is not None:
+            radii = float(params.radius)
         else:
             radii = None
         
@@ -211,11 +224,17 @@ class VisAlign(Task):
                                         type=FileType('r'),
                                         nargs='?',
                                         default=None)
-        parser.add_argument('--radii', metavar='RADIIFILE', 
-                                        help='File of point radii to use',
-                                        type=FileType('r'),
-                                        nargs='?',
-                                        default=None)
+        radius_group = parser.add_mutually_exclusive_group()
+        radois_group.add_argument('--radius', metavar='BASE_RADIUS',
+                                              help='Base radius to scale score by',
+                                              type=float,
+                                              nargs='?',
+                                              default=None)
+        radius_group.add_argument('--radii', metavar='RADIIFILE', 
+                                             help='File of point radii to use',
+                                             type=FileType('r'),
+                                             nargs='?',
+                                             default=None)
         parser.add_argument('--log', metavar='LOG',
                                      type=FileType,
                                      default=stderr,

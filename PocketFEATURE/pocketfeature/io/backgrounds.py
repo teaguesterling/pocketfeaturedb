@@ -10,6 +10,7 @@ from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity, 
     cutoff_tversky22_similarity,
     normalize_score,
+    scale_score_none,
 )
 from pocketfeature.io.featurefile import PocketFeatureBackgroundMetaData
 from pocketfeature.io import matrixvaluesfile
@@ -72,6 +73,7 @@ class BackgroundEnvironment(object):
                                 make_type_key=make_vector_type_key,
                                 compare_function=cutoff_tversky22_similarity,
                                 normalize_function=normalize_score,
+                                scale_function=scale_score_none,
                                 allowed_pairs=None,
                                 std_threshold=1.0):
         self._std_dev = std_dev
@@ -82,8 +84,9 @@ class BackgroundEnvironment(object):
         self._metadata = metadata
         self._compare_fn = compare_function
         self._normalize_fn = normalize_function
+        self._scale_fn = scale_function
         if isinstance(allowed_pairs, basestring):
-            allowed_pairs = ALLOWED_VECTOR_TYPE_PAIRS[allowed_pairs]
+            allowed_pairs = ALLOWED_VECTOR_TYPE_PAIRS[allowed_pairs] 
         self._allowed_pairs = allowed_pairs
         self._std_threshold_scale = std_threshold
         self._thresholds = None
@@ -168,6 +171,9 @@ class BackgroundEnvironment(object):
     @property
     def normalizations(self):
         return self._normalizations
+
+    def scale_alignment_score(nA, nB, nC, score):
+        return self._scale_fn(nA, nB, nC, score)
 
 
 def load_normalization_data(io, column=0):

@@ -32,7 +32,10 @@ nosetests.xml
 # Translations
 *.mo
 
-# Mr Developer
+# Developer
 .mr.developer.cfg
 .project
 .pydevproject
+.idea
+*.sw[poq]
+.anjuta

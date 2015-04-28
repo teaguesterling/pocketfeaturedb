@@ -22,6 +22,16 @@ def parameterized_feature_coefficient(fn):
     def similarity_matrix(params, as_, bs):
         return np.array([fn.batch_similarity(params, a, bs) for a in as_])
 
+    def stream_batch_similarities(params, as_, bs):
+        for a in as_:
+            yield fn.batch_similarity(params, a, bs)
+
+    def stream_similarities(params, as_, bs):
+        batches = fn.stream_batch_similarities(params, as_, bs)
+        for batch in batches:
+            for score in batch:
+                yield score
+
     def override_batch_similarity(bulk_fn):
         setattr(fn, 'batch_similarity', bulk_fn)
         return bulk_fn
@@ -35,12 +45,11 @@ def parameterized_feature_coefficient(fn):
 
     setattr(fn, 'override_batch_similarity', override_batch_similarity)
     setattr(fn, 'override_similarity_matrix', override_similarity_matrix)
+    setattr(fn, 'stream_batch_similarities', stream_batch_similarities)
+    setattr(fn, 'stream_similarities', stream_similarities)
 
     return fn
 
-
-def cosine_similarity(dummy, a, b):
-    return distance.cosine(a, b)
 
 @parameterized_feature_coefficient
 def reference_cutoff_tanimoto_similarity(cutoffs, a, b):
@@ -57,6 +66,7 @@ def reference_cutoff_tanimoto_similarity(cutoffs, a, b):
         return 0.
     else:
         return comm / (total * 2 - comm)
+
 
 @parameterized_feature_coefficient
 def adjusted_reference_cutoff_tanimoto_similarity(cutoffs, a, b):
@@ -75,6 +85,7 @@ def adjusted_reference_cutoff_tanimoto_similarity(cutoffs, a, b):
         return 0.
     else:
         return comm / total
+
 
 @parameterized_feature_coefficient
 def cutoff_tanimoto_similarity(cutoffs, a, b):
@@ -96,6 +107,24 @@ def cutoff_tanimoto_similarity(cutoffs, a, b):
         return intersection_size / union_size
     else:
         return 0.
+
+
+@cutoff_tanimoto_similarity.override_batch_similarity
+def bulk_cutoff_tanimoto_similarity(cutoffs, a, bs):
+    n = len(bs)
+    unions = np.logical_or(a !=0, bs != 0)
+    a_repeat = np.repeat(a[np.newaxis], n, axis=0)
+    cutoffs_repeat = np.repeat(cutoffs[np.newaxis], n, axis=0)
+    in_bounds = np.abs(a_repeat - bs) < cutoffs_repeat
+    intersections = np.logical_and(unions, in_bounds)
+    union_sizes = unions.sum(axis=1)
+    intersection_sizes = intersections.sum(axis=1)
+    old_error_settings = np.seterr(divide='ignore')
+    scores = intersection_sizes / union_sizes
+    scores[~np.isfinite(scores)] = 0.
+    np.seterr(**old_error_settings)
+    return scores
+
 
 @parameterized_feature_coefficient
 def cutoff_tversky22_similarity(cutoffs, a, b):
@@ -135,14 +164,45 @@ def bulk_cutoff_tversky22_similarity(cutoffs, a, bs):
     return scores
 
 
+@cutoff_tversky22_similarity.override_batch_similarity
+def bulk_cutoff_tversky22_similarity(cutoffs, a, bs):
+    n = len(bs)
+    unions = np.logical_or(a !=0, bs != 0)
+    a_repeat = np.repeat(a[np.newaxis], n, axis=0)
+    cutoffs_repeat = np.repeat(cutoffs[np.newaxis], n, axis=0)
+    in_bounds = np.abs(a_repeat - bs) < cutoffs_repeat
+    intersections = np.logical_and(unions, in_bounds)
+    union_sizes = unions.sum(axis=1)
+    intersection_sizes = intersections.sum(axis=1)
+    old_error_settings = np.seterr(divide='ignore')
+    scores = intersection_sizes / (2. * union_sizes - intersection_sizes)
+    scores[~np.isfinite(scores)] = 0.
+    np.seterr(**old_error_settings)
+    return scores
+
+
 def normalize_score(score, mode):
     return 2 / (1 + (score / mode) ** 2) - 1
 
 
-def scale_score_to_pocket_size(nA, nB, nAlign, score):
+def scale_score_none(nA, nB, nAlign, score, **params):
+    return score
+
+
+def scale_score_to_alignment_tanimoto(nA, nB, nAlign, score, **params):
     coeff = nAlign / (nA + nB - nAlign)
     rescaled = coeff * score
     return rescaled
+
+
+def scale_score_to_alignment_evalue(nA, nB, nAlign, score, **params):
+    if nAlign == 0 or score == 0:
+        return 0.
+    l = params.get('l', 5)
+    k = params.get('k', 10)
+    scale = k * (nA * nB) / nAlign ** 2
+    exp = np.exp(l * score)
+    return scale * exp
 
 
 def unique_product(p, q, skip=0):
@@ -192,8 +252,8 @@ def greedy_align(scores, maximize=False):
     chosen_keys = defaultdict(set)
     ordered_items = sorted(scores.items(), key=operator.itemgetter(1), reverse=maximize)
     for keys, value in ordered_items:
-	# Make sure we only check that a key has been chosen from a given item
-	indexed_keys = list(enumerate(keys))
+        # Make sure we only check that a key has been chosen from a given item
+        indexed_keys = list(enumerate(keys))
         if all(key not in chosen_keys[idx] for idx, key in indexed_keys):
             for idx, key in indexed_keys:
                 chosen_keys[idx].add(key)
@@ -205,7 +265,7 @@ def only_best_align(scores, maximize=False):
     # Determine functions/defaults
     if maximize:
         default = None, -np.inf
-        is_getter = operator.gt
+        is_better = operator.gt
     else:
         default = None, np.inf
         is_better = operator.lt
@@ -389,12 +449,16 @@ class GaussianStats(object):
         return np.sqrt(self.pop_variance)
 
     @property
-    def mode(self):
+    def sample_mode(self):
         mode = self.get_top_n_modes(1)
         if mode is not None:
             return mode[0][0]
         else:
             return None
+
+    @property
+    def mode(self):
+        return self.sample_mode
 
     @property
     def mode_count(self):
