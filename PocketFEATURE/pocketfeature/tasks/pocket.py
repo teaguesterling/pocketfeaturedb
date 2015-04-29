@@ -211,6 +211,23 @@ class PocketFinder(Task):
         return 0
 
     @classmethod
+    def defaults(cls, stdin, stdout, stderr, environ):
+        return {
+            'pdb': decompress(stdin),
+            'ligand': None,
+            'pdbid': None,
+            'model': 0,
+            'chain': '-',
+            'output': stdout,
+            'log': stderr,
+            'distance': cls.LIGAND_RESIDUE_DISTANCE,
+            'ignore_disordered': False,
+            'print_pointfile': True,
+            'print_residues': False,
+            'list_only': False,
+        } 
+
+    @classmethod
     def arguments(cls, stdin, stdout, stderr, environ, task_name):
         from argparse import ArgumentParser
         from pocketfeature.utils.args import (
@@ -222,48 +239,38 @@ class PocketFinder(Task):
         parser.add_argument('pdb', metavar='PDB', 
                                    type=ProteinFileType.compressed('r'),
                                    nargs='?',
-                                   default=decompress(stdin),
                                    help='Path to PDB file [default: STDIN]')
         parser.add_argument('ligand', metavar='LIG',
                                       type=str,
-                                      nargs='*',
+                                      nargs='?',
                                       help='Ligand ID to build pocket around [default: <largest>]')
         parser.add_argument('-i', '--pdbid', metavar='PDBID',
-                                      type=str,
-                                      default=None,
-                                      help='PDB ID to use for input structure [default: BEST GUESS]')
+                                             type=str,
+                                             help='PDB ID to use for input structure [default: BEST GUESS]')
         parser.add_argument('-m', '--model', metavar='MODEL_NUMBER',
-                                      type=int,
-                                      default=0,
-                                      help='Model index to input structure (-1 for all) [default: %(default)s]')
+                                             type=int,
+                                            help='Model index to input structure (-1 for all) [default: %(default)s]')
         parser.add_argument('-c', '--chain', metavar='CHAIN_ID',
                                       type=str,
-                                      default='-',
                                       help='Chain id to input structure (- for all) [default: %(default)s]')
         parser.add_argument('-o', '--output', metavar='PTF',
                                               type=FileType.compressed('w'),
-                                              default=stdout,
                                               help='Path to output file [default: STDOUT]')
         parser.add_argument('--log', metavar='LOG',
                                      type=FileType,
-                                     default=stderr,
                                      help='Path to log errors [default: STDERR]')
         parser.add_argument('-d', '--distance', metavar='CUTOFF',
                                               type=float,
-                                              default=cls.LIGAND_RESIDUE_DISTANCE,
                                               help='Residue active site distance threshold [default: %(default)s]')
         parser.add_argument('-I', '--ignore-disordered', action='store_true', 
-                                                         default=False,
                                                          help='Ignore additional coordinates for atoms [default: %(default)s]')
         parser.add_argument('-P', '--print-pointfile', action='store_true',
-                                                       default=True,
                                                        help='Print point file (default behavior)')
         parser.add_argument('-R', '--print-residues', action='store_true',
-                                                      default=False,
                                                       help='Print residue ID list instead of point file')
         parser.add_argument('-L', '--list-only', action='store_true',
-                                                 default=False,
                                                  help='List residues instead of creating pocket')
+        parser.set_defaults(**cls.defaults(stdin, stdout, stderr, environ))
         return parser
 
 if __name__ == '__main__':
