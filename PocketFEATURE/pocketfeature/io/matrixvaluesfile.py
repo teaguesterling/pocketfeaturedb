@@ -164,7 +164,7 @@ def load(io, dims=2, delimiter=None,
     if header:
         column_names = next(io).split(delimiter)[dims:]
         if columns is not None:
-            columns = [column_names.index(name) if isinstance(column, basestring) else column for column in columns]
+            columns = [column_names.index(name) if isinstance(column, string_types) else column for column in columns]
     else:
         column_names = None
     columns = list(columns) if columns is not None else None

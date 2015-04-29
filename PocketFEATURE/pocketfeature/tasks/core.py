@@ -39,7 +39,9 @@ def ensure_all_imap_unordered_results_finish(result, expected=None, wait=0.5):
 
 class Task(object):
 
-    def __init__(self, params):
+    def __init__(self, params=None, **kwargs):
+        if params is None and kwargs:
+            params = self.make_namespace(**kwargs)
         self.params = params
         self.output = getattr(params, 'output', sys.stdout)
         self.log = getattr(params, 'log', sys.stderr)
@@ -58,9 +60,20 @@ class Task(object):
 
     @classmethod
     def from_params(cls, **kwargs):
-        namespace = Namespace(**kwargs)
+        namespace = cls.make_namespace(**kwargs)
         task = cls.from_namespace(namespace)
         return task
+
+    @classmethod
+    def make_namespace(cls, **kwargs):
+        params = cls.defaults(sys.stdin, sys.stdout, sys.stderr, os.environ)
+        params.update(**kwargs)
+        namespace = Namespace(**params)
+        return namespace
+
+    @classmethod
+    def defaults(cls, stdin, stdout, stderr, environ):
+        return {}
 
     @classmethod
     def arguments(cls, stdin, stdout, stderr, environ, task_name):

@@ -324,13 +324,7 @@ class ComparePockets(Task):
         return 0
 
     @classmethod
-    def arguments(cls, stdin, stdout, stderr, environ, task_name):
-        from argparse import ArgumentParser
-        from pocketfeature.utils.args import (
-            decompress,
-            FileType,
-            ProteinFileType,
-        )
+    def defaults(cls, stdin, stdout, stderr, environ):
         background_ff = cls.BACKGROUND_FF_DEFAULT
         background_coeff = cls.BACKGROUND_COEFF_DEFAULT
 
@@ -343,6 +337,52 @@ class ComparePockets(Task):
             if not os.path.exists(background_coeff) and os.path.exists(env_bg_coeff):
                 background_coeff = env_bg_coeff
 
+        return {
+            'modelA': 0,
+            'modelB': 0,
+            'chainA': None,
+            'chainB': None,
+            'ligandA': None,
+            'ligandB': None,
+            'background': background_ff,
+            'normalization': background_coeff,
+            'allowed_pairs': 'classes',
+            'comparison_method': 'tversky22',
+            'alignment_method': 'onlybest',
+            'scale_method': 'none',
+            'std_threshold': 1.0,
+            'distance': cls.LIGAND_RESIDUE_DISTANCE,
+            'cutoff': cls.DEFAULT_CUTOFF,
+            'output': stdout,
+            'ptfA': None,
+            'ptfB': None,
+            'ffA': None,
+            'ffB': None,
+            'ptf_cache': None,
+            'ff_cache': None,
+            'pdb_dir': environ.get('PDB_DIR', '.'),
+            'dssp_dir': environ.get('DSSP_DIR', '.'),
+            'check_cache_first': False,
+            'link_cached': False,
+            'raw_scores': None,
+            'alignment': None,
+            'pymolA': None,
+            'pymolB': None,
+            'rescale': False,
+            'log': stderr,
+            'log_level': 'info',
+        }
+
+
+    @classmethod
+    def arguments(cls, stdin, stdout, stderr, environ, task_name):
+        from argparse import ArgumentParser
+        from pocketfeature.utils.args import (
+            decompress,
+            FileType,
+            ProteinFileType,
+        )
+
         parser = ArgumentParser("Identify and extract pockets around ligands in a PDB file")
         parser.add_argument('pdbA', metavar='PDBA', 
                                     type=ProteinFileType.compressed('r'),
@@ -353,68 +393,53 @@ class ComparePockets(Task):
         parser.add_argument('--modelA', metavar='MODELID',
                                          type=int,
                                          nargs='?',
-                                         default=0,
                                          help='PDB Model to use from PDB A [default: <first>]')
         parser.add_argument('--modelB', metavar='MODELID',
                                          type=str,
                                          nargs='?',
-                                         default=0,
                                          help='PDB Model to use from PDB B [default: <first>]')
         parser.add_argument('--chainA', metavar='CHAINID',
                                          type=int,
                                          nargs='?',
-                                         default=None,
                                          help='Chain to restrict pocket to from PDB A [default: <any>]')
         parser.add_argument('--chainB', metavar='CHAINID',
                                          type=str,
                                          nargs='?',
-                                         default=None,
                                          help='Chain to restrict pocket to from PDB B [default: <any>]')
         parser.add_argument('--ligandA', metavar='LIGA',
                                          type=str,
                                          nargs='?',
-                                         default=None,
                                          help='Ligand ID to build first pocket around [default: <largest>]')
         parser.add_argument('--ligandB', metavar='LIGB',
                                          type=str,
                                          nargs='?',
-                                         default=None,
                                          help='Ligand ID to build second pocket around [default: <largest>]')
         parser.add_argument('-b', '--background', metavar='FEATURESTATS',
                                       type=FileType.compressed('r'),
-                                      default=background_ff,
                                       help='FEATURE file containing standard devations of background [default: %(default)s]')
         parser.add_argument('-n', '--normalization', metavar='COEFFICIENTS',
                                       type=FileType.compressed('r'),
-                                      default=background_coeff,
                                       help='Map of normalization coefficients for residue type pairs [default: %(default)s')
         parser.add_argument('-p', '--allowed-pairs', metavar='PAIR_SET_NAME',
                                       choices=backgrounds.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
-                                      default='classes',
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
         parser.add_argument('-C', '--comparison-method', metavar='COMPARISON_METHOD',
                                       choices=FeatureFileCompare.COMPARISON_METHODS.keys(),
-                                      default='tversky22',
                                       help='Scoring mehtod to use (one of %(choices)s) [default: %(default)s]')
         parser.add_argument('-A', '--alignment-method', metavar='ALIGN_METHOD',
                                       choices=AlignScores.ALIGNMENT_METHODS,
-                                      default='onlybest',
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
         parser.add_argument('-S', '--scale-method', metavar='SCALE_METHOD',
                                       choices=AlignScores.SCALE_METHODS.keys(),
-                                      default='none',
                                       help="Method to re-scale score based on pocket sizes (one of: %(choices)s) [default: %(default)s]")
         parser.add_argument('-t', '--std-threshold', metavar='NSTD',
                                      type=float,
-                                     default=1.0,
                                      help="Number of standard deviations between to features to allow as 'similar'")
         parser.add_argument('-d', '--distance', metavar='DISTANCE',
-                                              type=float,
-                                              default=cls.LIGAND_RESIDUE_DISTANCE,
-                                              help='Residue active site distance threshold [default: %(default)s]')
+                                                type=float,
+                                                help='Residue active site distance threshold [default: %(default)s]')
         parser.add_argument('-c', '--cutoff', metavar='CUTOFF',
                                               type=float,
-                                              default=cls.DEFAULT_CUTOFF,
                                               help='Minium score (cutoff) to align [default: %(default)s')
         parser.add_argument('-o', '--output', metavar='RESULTS',
                                               type=FileType.compressed('a'),
@@ -422,41 +447,34 @@ class ComparePockets(Task):
                                               help='Path to results file [default: STDOUT]')
         parser.add_argument('--ptfA', metavar='PTFA',
                                       type=FileType.compressed('w'),
-                                      default=None,
                                       nargs='?',
                                       help='Path to first point file [default: None]')
         parser.add_argument('--ptfB', metavar='PTFB',
                                       type=FileType.compressed('w'),
-                                      default=None,
                                       nargs='?',
                                       help='Path to second point file [default: None]')
         parser.add_argument('--ffA', metavar='FFA',
                                      type=FileType.compressed('w'),
-                                     default=None,
                                      nargs='?',
                                      help='Path to first FEATURE file [default: None]')
         parser.add_argument('--ffB', metavar='FFB',
                                      type=FileType.compressed('w'),
-                                     default=None,
                                      nargs='?',
                                      help='Path to second FEATURE file [default: None]')
         parser.add_argument('--ptf-cache', metavar='PTF_CACHE_TPL',
                                            type=str,
-                                           default=None,
                                            nargs='?',
                                            help='Pattern to check for cached point files'
                                                 ' (variables: {pdbid})'
                                                 ' [default: None]')
         parser.add_argument('--ff-cache', metavar='FF_CACHE_TPL',
                                           type=str,
-                                          default=None,
                                           nargs='?',
                                           help='Pattern to check for cached FEATURE files'
                                                ' (variables: {pdbid, ligid, signature})'
                                                ' [default: None]')
         parser.add_argument('--pdb-dir', metavar='PDB_DIR',
                                          type=str,
-                                         default=environ.get('PDB_DIR'),
                                          nargs='?',
                                          help='Directory in which to search for PDB files'
                                               ' [default: %(default)s')
@@ -466,44 +484,36 @@ class ComparePockets(Task):
                                           nargs='?',
                                           help='Directory in which to search for DSSP files'
                                               ' [default: %(default)s')
-        parser.add_argument('--check-cached-first', default=False,
-                                                    action='store_true',
+        parser.add_argument('--check-cached-first', action='store_true',
                                                     help='Check for cache before extracting ligand')
-        parser.add_argument('--link-cached', default=False,
-                                             action='store_true',
+        parser.add_argument('--link-cached', action='store_true',
                                              help='Link cache files when found')
         parser.add_argument('--raw-scores', metavar='SCORES',
                                             type=FileType.compressed('w'),
-                                            default=None,
                                             nargs='?',
                                             help='Path to raw scores file [default: None]')
         parser.add_argument('--alignment', metavar='ALIGNMENT',
-                                            type=FileType.compressed('w'),
-                                            default=None,
-                                            nargs='?',
-                                            help='Path to alignment file [default: None]')
+                                           type=FileType.compressed('w'),
+                                           nargs='?',
+                                           help='Path to alignment file [default: None]')
         parser.add_argument('--pymolA', metavar='PYMOLA',
-                                     type=FileType('w'),
-                                     default=None,
-                                     nargs='?',
-                                     help='Path to first PyMol script [default: None]')
+                                        type=FileType('w'),
+                                        nargs='?',
+                                        help='Path to first PyMol script [default: None]')
         parser.add_argument('--pymolB', metavar='PYMOLB',
-                                     type=FileType('w'),
-                                     default=None,
-                                     nargs='?',
-                                     help='Path to second PyMol script [default: None]')
+                                        type=FileType('w'),
+                                        nargs='?',
+                                        help='Path to second PyMol script [default: None]')
         parser.add_argument('--rescale', action='store_true',
-                                         default=False,
                                          help='EXPERIMENTAL: Rescale score to pocket size [default: No]')
         parser.add_argument('--log', metavar='LOG',
                                      type=FileType,
-                                     default=stderr,
                                      help='Path to log errors [default: %(default)s]')
         parser.add_argument('--log-level', metavar='LEVEL',
                                            choices=LOG_LEVELS.keys(),
-                                           default='debug',
                                            nargs='?',
                                            help="Set log level (%(choices)s) [default: %(default)s]")
+        parser.set_defaults(**cls.defaults(stdin, stdout, stderr, environ))
         return parser
 
 
