@@ -10,6 +10,8 @@ from collections import (
 import functools
 import operator
 
+from six import string_types
+
 import numpy as np
 from scipy.spatial import distance
 from munkres import Munkres
@@ -332,7 +334,7 @@ class GaussianStats(object):
             self._bin_for_mode = mode_binning
         self._store_dest = store
         self.reset(n=n, mean=mean, m2=m2, mins=mins, maxes=maxes, mode_bins=mode_bins)
-        if isinstance(store_formatter, basestring):
+        if isinstance(store_formatter, string_types):
             self._store_formatter = store_formatter.format
         else:
             self._store_formatter = store_formatter

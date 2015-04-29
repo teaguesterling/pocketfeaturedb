@@ -2,11 +2,14 @@
 from __future__ import print_function
 
 from collections import OrderedDict
-from cStringIO import StringIO
 import operator
 
 import numpy as np
 
+from six import (
+    iteritems,
+    StringIO,
+)
 from feature.io import metadata
 
 from pocketfeature.algorithms import Indexer
@@ -43,7 +46,7 @@ class MatrixValues(OrderedDict):
         # Try to guess correct "shape" from first provided key
         if value_dims is None:
             try:
-                some_key = self.keys()[0]
+                some_key = list(self.keys())[0]
                 if isinstance(self[some_key], (list, tuple)):
                     value_dims = len(self[some_key])
                 else:
@@ -81,7 +84,7 @@ class MatrixValues(OrderedDict):
             matrix = np.zeros(self.shape, dtype=dtype)
         else:
             matrix = default * np.ones(self.shape, dtype=dtype)
-        for key, value in self.iteritems():
+        for key, value in iteritems(self):
             coords = tuple(self.indexes[i][pos] for i, pos in enumerate(key))
             matrix[coords] = value
         return matrix
@@ -90,7 +93,7 @@ class MatrixValues(OrderedDict):
         cls = type(self)
         if index in self.dim_refs:
             index = self.dim_refs[index]
-        items = ((k, v[index]) for k, v in self.iteritems())
+        items = ((k, v[index]) for k, v in iteritems(self))
         values = cls(items, value_dims=value_dims)
         return values
 
@@ -135,10 +138,10 @@ class PassThroughItems(object):
         self.entries = entries
         self.metadata = metadata
 
-    def items(self):
-        return list(self.entries)
-
     def iteritems(self):
+        return self.entries
+
+    def items(self):
         return self.entries
 
 
@@ -193,7 +196,7 @@ def dump(matrix_values, io, delimiter="\t", columns=None, tpl="{:.3f}", header=F
         dims = sorted(matrix_values.dim_refs.items(), key=operator.itemgetter(0))
         row.extend(str(dim[1]) for dim in dims)
         print(delimiter.join(row), file=io)
-    for key, values in matrix_values.iteritems():
+    for key, values in iteritems(matrix_values):
         if matrix_values.value_dims == 1:
             values = (values,)
         if columns is not None:

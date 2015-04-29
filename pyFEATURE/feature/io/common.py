@@ -11,18 +11,29 @@ def decompress(stream):
     """ Try to read determine if a stream is compressed, 
         if so use Gzip to decompress. Otherwise simply pass though
     """
-    try:
-        checked = BufferedReader(stream)
-        magic = checked.peek(2)
-    except AttributeError as e:
-        checked = stream
-        magic = None
+    print('decompress', stream, stream.closed)
+    if hasattr(stream, 'buffer'):
+        print('hasbuffer')
+        buffered = stream.buffer
+        magic = buffered.peek(2)
+        checked = buffered
+    else:
+        try:
+            print('reader')
+            buffered = BufferedReader(stream)
+            magic = buffered.peek(2)
+            checked = buffered
+        except AttributeError as e:
+            checked = stream
+            magic = None
 
     if magic == GZIP_MAGIC:
         decompressed = gzip.GzipFile(fileobj=checked)
     # TODO: Other compression methods
     else:
-        decompressed = checked
+        print('nozip')
+        decompressed = stream
+    print(decompressed, decompressed.closed)
     return decompressed
 
 

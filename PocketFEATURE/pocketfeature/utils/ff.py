@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-
+from six import string_types
 from pocketfeature.io.featurefile import (
     DESCRIPTION,
     RESIDUE_TYPE,
@@ -50,14 +50,14 @@ def get_vector_type(vector, comment_field=RESIDUE_TYPE):
 
 
 def get_vector(vectors, key):
-    if isinstance(key, basestring):
+    if isinstance(key, string_types):
         return vectors.get_by_name(key)
     else:
         return vectors[key]
 
 
 def has_vector(vectors, key):
-    if isinstance(key, basestring):
+    if isinstance(key, string_types):
         return vectors.has_vector_named(key)
     else:
         return key < len(vectors)

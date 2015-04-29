@@ -1,7 +1,6 @@
 #!/usr/bin/env pythoe
 from __future__ import print_function
 
-from cStringIO import StringIO
 import gzip
 import itertools
 import logging
@@ -12,6 +11,10 @@ import shutil
 import sys
 import time
 import random
+from six import (
+    string_types,
+    StringIO,
+)
 
 from feature.io.locate_files import pdbidFromFilename
 from feature.io.common import open_compressed
@@ -189,7 +192,7 @@ class BenchmarkPocketFeatureBackground(Task):
         self._num_negatives = 0
 
         self.cutoffs = self.params.cutoffs
-        if isinstance(self.cutoffs, basestring):
+        if isinstance(self.cutoffs, string_types):
             self.cutoffs = sorted(map(float, self.cutoffs.split(',')), reverse=True)
 
         cache_dir = os.path.join(params.bench_dir, 'cache')

@@ -41,18 +41,21 @@ class FileType(argparse.FileType):
         if wrapper is None:
             wrapper = lambda s: s
         self._wrapper = wrapper
-        self._opener = opener
+        self._opener = open
         self._extraargs = extraargs
 
     def __call__(self, string):
         if string == '-':
             stream = super(FileType, self).__call__(string)
         try:
-            stream = self._opener(string, mode=self._mode, **self._extraargs)
+            stream = self._opener(string, self._mode, **self._extraargs)
+            print("OPENED", stream, stream.closed)
         except OSError as e:
             message = _("can't open '%s': %s")
             raise ArgumentError(message % (string, e))
+        print(self._wrapper)
         wrapped = self._wrapper(stream)
+        print("WRAPPED", wrapped, wrapped.closed)
         return wrapped
 
     @classmethod
@@ -84,7 +87,7 @@ class ProteinFileType(FileType):
             stream = super(FileType, self).__call__(string)
         try:
             located = self.locate(string)
-            stream = self._opener(located, mode=self._mode, **self._extraargs)
+            stream = self._opener(located, self._mode, **self._extraargs)
         except OSError as e:
             message = _("can't open '%s': %s")
             raise ArgumentTypeError(message % (string, e))

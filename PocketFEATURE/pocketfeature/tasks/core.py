@@ -90,7 +90,11 @@ class Task(object):
           conf['task_name'] = self.task_name()
 
         parser = cls.arguments(**conf)
+        print(args)
         params = parser.parse_args(args)
+        print(params)
+        print(params.background, params.background.closed)
+        print(params.background, params.background.closed)
         task = cls.from_namespace(params)
         return task.run()
 

@@ -2,6 +2,10 @@ from Bio.PDB.PDBParser import PDBParser
 
 import gzip
 import os
+from six import (
+    string_types,
+    StringIO,
+)
 
 from pocketfeature.utils.pdb import guess_pdbid_from_stream
 
@@ -73,7 +77,7 @@ class PDBFocus(object):
             else:
                 self._model_id = model_id
 
-            if isinstance(chain_id, basestring):
+            if isinstance(chain_id, string_types):
                 chains = enumerate(self.model.get_list())
                 found = [cid for cid in chains if cid[1].get_id() == chain_id]
                 if found:

@@ -1,7 +1,6 @@
 from __future__ import print_function
 
-from cStringIO import StringIO
-
+from six import StringIO
 from pocketfeature.utils.pdb import (
     find_residues_by_id,
     residue_id

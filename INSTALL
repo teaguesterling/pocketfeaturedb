@@ -40,7 +40,7 @@ pip uninstall pyFEATURE PocketFEATURE
 
 set -e
 
-if [ ! -z $VIRTUAL_ENV -a ! -d $VIRTUAL_ENV/lib/python2.7/site-packages/numpy/core/include ]; then
+if [ ! -z $VIRTUAL_ENV -a ! -d $VIRTUAL_ENV/lib/python?.?/site-packages/numpy/core/include ]; then
     echo "Fixing Numpy/Virtualenv issues"
     pip install --force-reinstall --upgrade numpy
 fi

@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 import sys, os
 
-version = '0.1'
+version = '0.2'
 
 setup(name='pyFEATURE',
       version=version,
@@ -18,6 +18,7 @@ Python interface to the Stanford FEATURE biomolecular structure analysis tools""
       install_requires=[
           'numpy>=1.6.2',
           'sh>=1.08',
+          'six>=1.9.0',
       ],
       entry_points={}
 )

@@ -50,7 +50,7 @@ class IteratorIO(object):
                 chunk = self.next()
                 data += chunk
                 count += len(chunk)
-        except StopIteration, e:
+        except StopIteration as e:
             self.leftover = ''
             return data
 

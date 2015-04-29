@@ -9,6 +9,10 @@ import multiprocessing
 import os
 import sys
 import random
+from six import (
+    string_types,
+    StringIO,
+)
 
 from feature.backends.external import generate_dssp_file 
 from feature.backends.wrappers import featurize_points_raw
@@ -92,7 +96,7 @@ def pocket_from_pocket_def(pocket_def, if_no_ligand=pick_best_ligand,
                                        distance_threshold=6.0):
     pdb_data, ligand_data = pocket_def
     
-    if isinstance(pdb_data, basestring):
+    if isinstance(pdb_data, string_types):
         pdb_path = pdb_data
     else:
         pdb_id, pdb_path = pdb_data

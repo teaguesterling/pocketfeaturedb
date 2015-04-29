@@ -3,12 +3,17 @@
 from __future__ import print_function
 
 import copy
-from cStringIO import StringIO
 from collections import OrderedDict, namedtuple
 import operator
 import itertools
 
-from common import attempt_cast
+from six import (
+    string_types,
+    iteritems,
+    StringIO,
+)
+
+from feature.io.common import attempt_cast
 
 LINE_TEMPLATE = "# {0}\t{1}"
 CONTAINER_TYPES = (list, set, dict)
@@ -69,7 +74,7 @@ class MetaData(OrderedDict):
         elif isinstance(value, CONTAINER_TYPES):
             casts = [attempt_cast(v, default=str) for v in value]
             value = map(operator.itemgetter(1), casts)
-        elif isinstance(value, basestring):  # Parsed above
+        elif isinstance(value, string_types):  # Parsed above
             new_type, value = attempt_cast(value, default=str)
         else:
             raise ValueError("Received unexpected raw type (should be string)")
@@ -95,7 +100,7 @@ class MetaData(OrderedDict):
     @classmethod
     def clone_defaults(cls, _extend_lists=True, **changes):
         new = copy.deepcopy(getattr(cls, 'DEFAULTS', {}))
-        for key, value in changes.iteritems():
+        for key, value in iteritems(changes):
             if key in new and _extend_lists:
                 existing = new[key]
                 value = _update_value(existing, value)

@@ -4,6 +4,11 @@
 #TODO: Integrate this with residue definition files
 
 import itertools
+from six import (
+    string_types,
+    StringIO,
+)
+from six.moves import filter
 
 from pocketfeature.io import featurefile
 from pocketfeature.algorithms import (
@@ -85,7 +90,7 @@ class BackgroundEnvironment(object):
         self._compare_fn = compare_function
         self._normalize_fn = normalize_function
         self._scale_fn = scale_function
-        if isinstance(allowed_pairs, basestring):
+        if isinstance(allowed_pairs, string_types):
             allowed_pairs = ALLOWED_VECTOR_TYPE_PAIRS[allowed_pairs] 
         self._allowed_pairs = allowed_pairs
         self._std_threshold_scale = std_threshold
@@ -112,7 +117,7 @@ class BackgroundEnvironment(object):
 
     def get_allowed_pairs(self, fileA, fileB):
         pairs = itertools.product(fileA.vectors, fileB.vectors)
-        allowed_pairs = itertools.ifilter(self.is_allowed_pair, pairs)
+        allowed_pairs = filter(self.is_allowed_pair, pairs)
         return allowed_pairs
 
     def vector_similarity(self, vectorA, vectorB):

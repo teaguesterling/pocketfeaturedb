@@ -1,7 +1,7 @@
 from __future__ import print_function
 
-from cStringIO import StringIO
 import numpy as np
+from six import StringIO
 
 
 def property_dtype(property):

@@ -1,7 +1,7 @@
 from __future__ import print_function
 
-from cStringIO import StringIO
 import numpy as np
+from six import StringIO
 
 COORDS_LINE = "{:.3f}\t{:.3f}\t{:.3f}"
 POINT_LINE = "{}\t" + COORDS_LINE

@@ -65,8 +65,8 @@ def create_alignment_visualizations(pointsA, pointsB, alignment, pdbA=None,
         pointsB = list(pointsB)
         pointMapA = {get_point_name(p): p for p in pointsA}
         pointMapB = {get_point_name(p): p for p in pointsB}
-        ligandA = ligand_to_pymol_selector(pointMapA.keys()[0])
-        ligandB = ligand_to_pymol_selector(pointMapB.keys()[0])
+        ligandA = ligand_to_pymol_selector(list(pointMapA.keys())[0])
+        ligandB = ligand_to_pymol_selector(list(pointMapB.keys())[0])
 
         if len(alignment) > 0:
              alignedKeysA, alignedKeysB = zip(*alignment.keys())

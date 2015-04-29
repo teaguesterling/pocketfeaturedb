@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 from __future__ import print_function
-
-from cStringIO import StringIO
 import re
 
 import numpy as np
 
+from six import StringIO
 from feature.io.metadata import dump as dump_metadata
 from feature.io.metadata import (
     extract_metadata,

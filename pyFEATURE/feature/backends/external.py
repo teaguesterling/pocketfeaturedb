@@ -9,14 +9,17 @@
     work flow. Future versions of this script will depend on a unified set
     of data structures for passing/returning results.
 """
-
-from cStringIO import StringIO
 import gzip
 import os
 import sys
 import tempfile
 
 import sh
+
+from six import (
+    iteritems,
+    StringIO,
+)
 
 try:
     import tempfile
@@ -242,7 +245,7 @@ def featurize(pdbid=None,
     if environ is None:
         environ = default_environ
     else:
-        for key, value in feature_environ.iteritems():
+        for key, value in iteritems(feature_environ):
             if key not in environ:
                 environ[key] = value
     if feature_dir is not None:

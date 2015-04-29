@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
+from six import (
+    string_types,
+    StringIO,
+)
 from numpy.linalg import norm
 from Bio.PDB.NeighborSearch import NeighborSearch
 
@@ -84,7 +88,7 @@ def find_neighboring_residues_and_points(structure, queries, cutoff=6.0,
                     residues.append(residue_points)
                     picked.add(residue)
     if ordered:
-        residues = sorted(residues, key=lambda (r,p): r.get_id()[1])
+        residues = sorted(residues, key=lambda pair: pair[0].get_id()[1])
     
     return residues
 
@@ -125,7 +129,7 @@ def create_pocket_around_ligand(structure, ligand, cutoff=6.0,
 
 def find_ligand_in_structure(structure, ligand_name, index=0):
     lig_id = residuefile.read_residue_id(ligand_name)
-    if isinstance(lig_id, basestring):
+    if isinstance(lig_id, string_types):
         found = find_residues_by_name(structure, lig_id)
     elif isinstance(lig_id, int):
         found = find_residues_by_id(structure, [lig_id], full=False)
