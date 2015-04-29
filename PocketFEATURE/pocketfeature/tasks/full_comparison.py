@@ -171,7 +171,6 @@ class ComparePockets(Task):
         alignment_method = AlignScores.ALIGNMENT_METHODS[params.alignment_method]
         scale_method = AlignScores.SCALE_METHODS[params.scale_method]
 
-        print(params.background, params.background.closed)
         background = backgrounds.load(stats_file=params.background,
                                       norms_file=params.normalization,
                                       compare_function=comparison_method,

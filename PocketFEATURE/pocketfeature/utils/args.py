@@ -49,13 +49,10 @@ class FileType(argparse.FileType):
             stream = super(FileType, self).__call__(string)
         try:
             stream = self._opener(string, self._mode, **self._extraargs)
-            print("OPENED", stream, stream.closed)
         except OSError as e:
             message = _("can't open '%s': %s")
             raise ArgumentError(message % (string, e))
-        print(self._wrapper)
         wrapped = self._wrapper(stream)
-        print("WRAPPED", wrapped, wrapped.closed)
         return wrapped
 
     @classmethod
