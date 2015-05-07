@@ -14,6 +14,7 @@ DEFAULT_CUTOFFS = [0.1, 0.1, 0, -0.1, -0.15, -0.2, -0.25, -0.3]
 
 def make_all_plots(pos_file, cont_file, cutoffs=None):
     cutoffs = map(float, cutoffs.split(',')) if cutoffs else DEFAULT_CUTOFFS
+
     with open(pos_file) as f:
         positives = matrixvaluesfile.load(f, cast=float)
 
