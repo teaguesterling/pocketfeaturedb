@@ -62,6 +62,12 @@ ALLOWED_SIMILARITY_METRICS = {
     'tversky22': cutoff_tversky22_similarity,
 }
 
+ALLOWED_SCALE_FUNCTIONS = {
+    'none': scale_score_none,
+    'fitted-z': scale_score_fitted_z,
+    'fitted-evd': scale_score_fitted_evd,
+}
+
 
 class BackgroundEnvironment(object):
     """ An object containing information about a calculated PocketFEATURE background """
@@ -74,6 +80,7 @@ class BackgroundEnvironment(object):
                                 compare_function=cutoff_tversky22_similarity,
                                 normalize_function=normalize_score,
                                 scale_function=scale_score_none,
+                                scale_params=(),
                                 allowed_pairs=None,
                                 std_threshold=1.0):
         self._std_dev = std_dev
@@ -85,6 +92,7 @@ class BackgroundEnvironment(object):
         self._compare_fn = compare_function
         self._normalize_fn = normalize_function
         self._scale_fn = scale_function
+        self._scale_params = scale_params
         if isinstance(allowed_pairs, basestring):
             allowed_pairs = ALLOWED_VECTOR_TYPE_PAIRS[allowed_pairs] 
         self._allowed_pairs = allowed_pairs
@@ -172,11 +180,12 @@ class BackgroundEnvironment(object):
     def normalizations(self):
         return self._normalizations
 
-    def scale_alignment_score(nA, nB, nC, score):
-        return self._scale_fn(nA, nB, nC, score)
+    def scale_alignment_score(params, sizes, score):
+        return self._scale_fn(params, sizes, score)
 
 
-def load_normalization_data(io, column=0):
+def load_normalization_data(io, column=0, metadata=None):
+    # TODO: Extract comparison method from metadata
     norms = matrixvaluesfile.load(io, cast=float,
                                       make_key=make_vector_type_key,
                                       header=True)
@@ -190,6 +199,14 @@ def load_stats_data(io, metadata=None):
     return stats_ff
 
 
+def load_fit_data(io, metadata=None):
+    # TODO: Extract method and measure from metadata
+    # First line is scaling method
+    method_name = next(io).strip()
+    params = [map(float, line.split()) for line in io]
+    return method_name, params
+
+
 def load(stats_file, norms_file, wrapper=BackgroundEnvironment, 
                                  vector_type=get_vector_type,
                                  make_type_key=make_vector_type_key,
@@ -200,9 +217,17 @@ def load(stats_file, norms_file, wrapper=BackgroundEnvironment,
                                  compare_function=cutoff_tanimoto_similarity,
                                  normalize_function=normalize_score,
                                  allowed_pairs=None,
+                                 scale_file=None,
                                  std_threshold=1.0):
     stats_ff = load_stats_data(stats_file, metadata)
     stats_bgs = load_normalization_data(norms_file)
+    if scale_file:
+        scale_method, scale_params = load_fit_data(scale_file)
+        scale_fn = ALLOWED_SCALE_FUNCTIONS[scale_method]
+    else:
+        scale_method = scale_score_none
+        scale_params = ()
+ _
     coeffs = stats_bgs.slice_values(norm_column)
 
     metadata = stats_ff.metadata
@@ -224,5 +249,7 @@ def load(stats_file, norms_file, wrapper=BackgroundEnvironment,
                          compare_function=compare_function,
                          normalize_function=normalize_function,
                          allowed_pairs=allowed_pairs,
-                         std_threshold=std_threshold)
+                         std_threshold=std_threshold,
+                         scale_funciton=scale_method,
+                         scale_params=scale_params)
     return background
