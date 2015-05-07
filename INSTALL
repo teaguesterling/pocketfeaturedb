@@ -55,6 +55,10 @@ if [ -z "$VIRTUAL_ENV" ]; then
 		echo "Creating ~/pocketfeature"
 		virtualenv ~/pocketfeature
 		source ~/pocketfeature/bin/activate
+		echo "Python =" $( which python ) "pip =" $( which pip )
+		echo "Remember to run 'source ~/pocketfeature/bin/activate' to use PocketFEATURE"
+		echo "Press ENTER to continue..."
+		read
 	elif [ "$CREATE" == "n" ]; then
 		echo "Proceeding without any virtualenv"
 	else
@@ -99,7 +103,14 @@ cd ../
 
 echo "INSTALLING PocketFEATURE"
 cd PocketFEATURE
-python setup.py install
+if ! python setup.py install; then
+	echo "PocketFEATURE or one of its dependencies failed"
+	echo "Don't Panic (just yet)"
+	echo "Attempting to install scipy separately (a common problem)"
+	pip install scipy
+	echo "Attempting to reinstall PocketFEATURE"
+	python setup.py install
+fi
 cd ../
 
 echo "RUNNING SANITY TEST"
@@ -177,3 +188,10 @@ fi
 #    echo "pymol -l /tmp/1qhx.py &"
 #    echo "pymol -l /tmp/1qrd.py &"
 #fi
+
+echo "PocketFEATURE binaries (run_pf, pf_gen_bg, etc.) installed in:" 
+echo $( dirname $( which run_pf ) )
+if [ ! -z "$VIRTUAL_ENV" ]; then
+	echo "Remember to activate your virtualenv:"
+	echo "source ${VIRTUAL_ENV}/bin/activate"
+fi
