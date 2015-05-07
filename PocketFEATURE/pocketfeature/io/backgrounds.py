@@ -16,6 +16,8 @@ from pocketfeature.algorithms import (
     cutoff_tversky22_similarity,
     normalize_score,
     scale_score_none,
+    scale_score_fitted_zscore,
+    scale_score_fitted_evd,
 )
 from pocketfeature.io.featurefile import PocketFeatureBackgroundMetaData
 from pocketfeature.io import matrixvaluesfile
@@ -69,7 +71,7 @@ ALLOWED_SIMILARITY_METRICS = {
 
 ALLOWED_SCALE_FUNCTIONS = {
     'none': scale_score_none,
-    'fitted-z': scale_score_fitted_z,
+    'fitted-z': scale_score_fitted_zscore,
     'fitted-evd': scale_score_fitted_evd,
 }
 
@@ -185,8 +187,8 @@ class BackgroundEnvironment(object):
     def normalizations(self):
         return self._normalizations
 
-    def scale_alignment_score(params, sizes, score):
-        return self._scale_fn(params, sizes, score)
+    def scale_alignment_score(sizes, score):
+        return self._scale_fn(self._scale_params, sizes, score)
 
 
 def load_normalization_data(io, column=0, metadata=None):
@@ -232,7 +234,7 @@ def load(stats_file, norms_file, wrapper=BackgroundEnvironment,
     else:
         scale_method = scale_score_none
         scale_params = ()
- _
+ 
     coeffs = stats_bgs.slice_values(norm_column)
 
     metadata = stats_ff.metadata
@@ -255,6 +257,6 @@ def load(stats_file, norms_file, wrapper=BackgroundEnvironment,
                          normalize_function=normalize_function,
                          allowed_pairs=allowed_pairs,
                          std_threshold=std_threshold,
-                         scale_funciton=scale_method,
+                         scale_function=scale_method,
                          scale_params=scale_params)
     return background
