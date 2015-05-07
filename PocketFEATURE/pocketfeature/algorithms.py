@@ -11,6 +11,7 @@ import functools
 import operator
 
 import numpy as np
+from scipy import stats
 from scipy.spatial import distance
 from munkres import Munkres
 
@@ -169,24 +170,50 @@ def normalize_score(score, mode):
     return 2 / (1 + (score / mode) ** 2) - 1
 
 
-def scale_score_none(nA, nB, nAlign, score, **params):
+def scale_score_none(params, sizes, score):
     return score
 
 
-def scale_score_to_alignment_tanimoto(nA, nB, nAlign, score, **params):
+def scale_score_to_alignment_tanimoto(params, sizes, score):
+    nA, nB, nP, nAlign = sizes
     coeff = nAlign / (nA + nB - nAlign)
     rescaled = coeff * score
     return rescaled
 
 
-def scale_score_to_alignment_evalue(nA, nB, nAlign, score, **params):
+def scale_score_to_alignment_evalue(params, sizes, score):
+    nA, nB, nP, nAlign = sizes
     if nAlign == 0 or score == 0:
         return 0.
-    l = params.get('l', 5)
-    k = params.get('k', 10)
+    if len(params) >= 2:
+        l, k = params[:2]
+    else:
+        l, k = 5, 10
     scale = k * (nA * nB) / nAlign ** 2
     exp = np.exp(l * score)
     return scale * exp
+
+
+def nonlinear_fit(x, m, p, b):
+    return m * x ** p + b
+
+
+def scale_score_fitted_zscore(params, sizes, score):
+    nA, nB, nP, nAlign = sizes
+    muM, muP, muB, sigM, sigP, sigB = params
+    mu =  nonlinear_fit(score, muM, muP, muB)
+    sigma = nonlinear_fit(score, sigM, sigP, sigB)
+    z_score = (score - mu) / sigma
+    return z_score
+
+
+def scale_score_fitted_evd(params, sizes, score):
+    z_params = params[:6]
+    evd_params = params[6:]
+    dist = stats.gumbl_r(*evd_params)
+    z_score = scale_score_fitted_zscore(z_params, sizes, score)
+    pvalue = dist.pdf(z_score)
+    return pvalue
 
 
 def unique_product(p, q, skip=0):
