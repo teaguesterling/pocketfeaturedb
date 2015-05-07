@@ -288,7 +288,9 @@ class ComparePockets(Task):
             num_scored_a, num_scored_b = 0, 0
         log.debug("Aligned {0} points".format(len(alignment)))
         total_score = sum(alignment.values())
-        scaled_score = scale_method(num_scored_a, num_scored_b, num_aligned, total_score)
+        scale_params = ()
+        scale_sizes = (numA, numB, len(scores), num_aligned)
+        scaled_score = scale_method(scale_params, scale_sizes, total_score)
         alignment_with_raw_scores = scores.subset_from_keys(alignment.keys())
         
         if params.alignment is not None:
