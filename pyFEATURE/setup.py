@@ -16,9 +16,9 @@ Python interface to the Stanford FEATURE biomolecular structure analysis tools""
       include_package_data=True,
       zip_safe=True,
       install_requires=[
-          'numpy>=1.6.2',
-          'sh>=1.08',
-          'six>=1.9.0',
+          'numpy',
+          'sh',
+          'six',
       ],
       entry_points={}
 )

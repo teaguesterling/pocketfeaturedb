@@ -18,11 +18,18 @@ setup(name='PocketFEATURE',
       include_package_data=True,
       zip_safe=True,
       install_requires=[
-          'numpy>=1.6.2',
-          'scipy>=0.7.0',
-          'biopython>=1.58',
-          'munkres>=1.0.6',
-          'six>=1.9.0',
+          # Version #s don't play nice on OS X?
+          #'numpy>=1.6.2',
+          #'scipy>=0.7.0',
+          #'biopython>=1.58',
+          #'munkres>=1.0.6',
+          #'six>=1.9.0',
+          'argparse',
+          'numpy',
+          'scipy',
+          'biopython',
+          'munkres',
+          'six',
       ],
       entry_points={
         'console_scripts': [
