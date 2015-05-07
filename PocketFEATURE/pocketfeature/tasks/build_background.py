@@ -30,7 +30,6 @@ from pocketfeature.algorithms import (
     cutoff_tanimoto_similarity,
     cutoff_tversky22_similarity,
     GaussianStats,
-    SkewGaussianStats,
     unique_product,
 )
 from pocketfeature.io import (

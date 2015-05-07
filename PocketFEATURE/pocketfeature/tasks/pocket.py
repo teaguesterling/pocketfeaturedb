@@ -212,6 +212,7 @@ class PocketFinder(Task):
 
     @classmethod
     def defaults(cls, stdin, stdout, stderr, environ):
+        from pocketfeature.utils.args import decompress
         return {
             'pdb': decompress(stdin),
             'ligand': None,
