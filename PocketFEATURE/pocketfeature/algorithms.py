@@ -166,6 +166,23 @@ def bulk_cutoff_tversky22_similarity(cutoffs, a, bs):
     return scores
 
 
+@cutoff_tversky22_similarity.override_batch_similarity
+def bulk_cutoff_tversky22_similarity(cutoffs, a, bs):
+    n = len(bs)
+    unions = np.logical_or(a !=0, bs != 0)
+    a_repeat = np.repeat(a[np.newaxis], n, axis=0)
+    cutoffs_repeat = np.repeat(cutoffs[np.newaxis], n, axis=0)
+    in_bounds = np.abs(a_repeat - bs) < cutoffs_repeat
+    intersections = np.logical_and(unions, in_bounds)
+    union_sizes = unions.sum(axis=1)
+    intersection_sizes = intersections.sum(axis=1)
+    old_error_settings = np.seterr(divide='ignore')
+    scores = intersection_sizes / (2. * union_sizes - intersection_sizes)
+    scores[~np.isfinite(scores)] = 0.
+    np.seterr(**old_error_settings)
+    return scores
+
+
 def normalize_score(score, mode):
     return 2 / (1 + (score / mode) ** 2) - 1
 
@@ -306,7 +323,6 @@ def only_best_align(scores, maximize=False):
     prioritized = sorted(accepted, key=operator.itemgetter(1), reverse=maximize)
 
     return prioritized
-
 
 
 def munkres_align(scores, shift_negative=False, maximize=False):
@@ -486,81 +502,6 @@ class GaussianStats(object):
     @property
     def maxes(self):
         return self._maxes
-
-
-class SkewGaussianStats(GaussianStats):
-    def __init__(self, **kwargs):
-        m3 = kwargs.pop('m3', None)
-        super(SkewGaussianStats, self).__init__(**kwargs)
-        if m3 is not None:
-            self._m3 = np.array(m3)
-
-    def reset(self, **kwargs):
-        m3 = kwargs.pop('m3', None)
-        if m3 is None:
-            m3 = np.zeros(1)
-        super(SkewGaussianStats, self).reset(**kwargs)
-        self._m3 = np.array(m3)
-
-    def record(self, item):
-        sample = np.array(item)
-
-        n = self._n + 1
-        delta = sample - self._mean
-        delta_n = delta / n
-        delta_n2 = delta_n ** 2
-        term1 = delta * delta_n * self._n
-        mean = self._mean + delta_n
-        m2 = self._m2 + term1
-        m3 = self._m3 + term1 * delta_n * (n - 2) - 3 * delta_n * self._m2
-        mins = np.minimum(self._mins, sample)
-        maxes = np.maximum(self._maxes, sample)
-
-        if self._mode_counts is not None:
-            bin = self._bin_for_mode(item)
-            self._mode_counts[bin] += 1
-
-        self._n = n
-        self._mean = mean
-        self._m2 = m2
-        self._m3 = m3
-        self._mins = mins
-        self._maxes = maxes
-
-        self.store(item)
-
-        return item
-
-    @property
-    def skew(self):
-        return (np.sqrt(self._n) * self._m3) / (self._m2 ** 3/2.)
-
-    @property
-    def skew_delta(self):
-        sign = np.sign(self._m3)
-        gamma = abs(self.skew)**(2/3)
-        denom = gamma + ((4 - np.pi) / 2) ** (2/3)
-        abs_delta = np.sqrt((np.pi / 2) * (gamma / denom))
-        delta = sign * abs_delta
-        return delta
-
-    @property
-    def skew_shape(self):
-        delta = self.skew_delta
-        alpha = delta / np.sqrt(1 - delta**2)
-        return alpha
-
-    @property
-    def skew_mean(self):
-        return self.mean + self.std_dev * self.skew_delta * np.sqrt(2 / np.pi)
-
-    @property
-    def skew_variance(self):
-        return self.variance ** 2 * (1 - (2 * self.skew_delta ** 2 / np.pi))
-
-    @property
-    def mode(self):
-        return self.skew_mean
 
 
 class Indexer(defaultdict):

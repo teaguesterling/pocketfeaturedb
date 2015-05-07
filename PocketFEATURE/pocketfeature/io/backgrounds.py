@@ -123,28 +123,28 @@ class BackgroundEnvironment(object):
         allowed_pairs = itertools.ifilter(self.is_allowed_pair, pairs)
         return allowed_pairs
 
-    def tanimoto_similarity(self, vectorA, vectorB):
+    def vector_similarity(self, vectorA, vectorB):
         featuresA = vectorA.features
         featuresB = vectorB.features
         cutoffs = self.thresholds
         return self._compare_fn(cutoffs, featuresA, featuresB)
 
-    def normalized_similarity(self, vectorA, vectorB):
-        _, norm = self.normalized_tanimoto_similarity(vectorA, vectorB)
+    def normalized_vector_similarity(self, vectorA, vectorB):
+        _, norm = self.vector_and_normalized_similarity(vectorA, vectorB)
         return norm
 
-    def normalized_tanimoto_similarity(self, vectorA, vectorB):
+    def vector_and_normalized_similarity(self, vectorA, vectorB):
         key = self.get_vector_pair_key(vectorA, vectorB)
         normalization_coeff = self._normalizations[key]
-        tanimoto = self.tanimoto_similarity(vectorA, vectorB)
-        normalized = self._normalize_fn(tanimoto, normalization_coeff)
-        return tanimoto, normalized
+        score = self.vector_similarity(vectorA, vectorB)
+        normalized = self._normalize_fn(score, normalization_coeff)
+        return score, normalized
 
     def compare_featurefiles(self, vectorA, vectorB, normalize=True):
         if normalize:
-            get_score = self.normalized_tanimoto_similarity
+            get_score = self.vector_and_normalized_similarity
         else:
-            get_score = self.tanimoto_similarity
+            get_score = self.vector_similarity
         pairs = self.get_allowed_pairs(vectorA, vectorB)
         for vector1, vector2 in pairs:
             key = self.get_vector_pair_key(vector1, vector2)
@@ -214,7 +214,7 @@ def load(stats_file, norms_file, wrapper=BackgroundEnvironment,
                                  mean_vector=MEAN_VECTOR,
                                  metadata=None,
                                  norm_column='mode',
-                                 compare_function=cutoff_tanimoto_similarity,
+                                 compare_function=cutoff_tversky22_similarity,
                                  normalize_function=normalize_score,
                                  allowed_pairs=None,
                                  scale_file=None,
