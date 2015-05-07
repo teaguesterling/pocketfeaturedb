@@ -30,7 +30,7 @@
 #
 #
 
-if [ ! -z $1 ]; then
+if [ ! -z "$1" ]; then
 	SCORES="--raw-scores ${1}.scores"
 	ALIGN="--alignment ${1}.align"
 fi
@@ -40,7 +40,7 @@ pip uninstall pyFEATURE PocketFEATURE
 
 set -e
 
-if [ ! -z $VIRTUAL_ENV -a ! -d $VIRTUAL_ENV/lib/python?.?/site-packages/numpy/core/include ]; then
+if [ ! -z "$VIRTUAL_ENV" -a ! -d $VIRTUAL_ENV/lib/python?.?/site-packages/numpy/core/include ]; then
     echo "Fixing Numpy/Virtualenv issues"
     pip install --force-reinstall --upgrade numpy
 fi
@@ -53,7 +53,7 @@ if [ ! $( which featurize ) ]; then
 fi
 
 echo "Checking FEATURE environment"
-if [ -z $FEATURE_DIR ]; then
+if [ -z "$FEATURE_DIR" ]; then
     echo "Warning: FEATURE_DIR not set. PocketFEATURE will try to guess"
     echo "Note: This can also be solved by calling PocketFEATURE programs"
     echo "      with the --feature-dir argument"
