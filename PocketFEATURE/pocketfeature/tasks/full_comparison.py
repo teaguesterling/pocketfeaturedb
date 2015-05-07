@@ -330,6 +330,15 @@ class ComparePockets(Task):
         background_ff = cls.BACKGROUND_FF_DEFAULT
         background_coeff = cls.BACKGROUND_COEFF_DEFAULT
 
+        if 'POCKETFEATURE_DIR' in os.environ:
+            pocketfeature_dir = os.environ.get('POCKETFEATURE_DIR')
+            env_bg_ff = os.path.join(pocketfeature_dir, background_ff)
+            env_bg_coeff = os.path.join(pocketfeature_dir, background_coeff)
+            if not os.path.exists(background_ff) and os.path.exists(env_bg_ff):
+                background_ff = env_bg_ff
+            if not os.path.exists(background_coeff) and os.path.exists(env_bg_coeff):
+                background_coeff = env_bg_coeff
+
         if 'FEATURE_DIR' in os.environ:
             feature_dir = os.environ.get('FEATURE_DIR')
             env_bg_ff = os.path.join(feature_dir, background_ff)
@@ -338,6 +347,12 @@ class ComparePockets(Task):
                 background_ff = env_bg_ff
             if not os.path.exists(background_coeff) and os.path.exists(env_bg_coeff):
                 background_coeff = env_bg_coeff
+
+        if not os.path.exists(background_ff):
+            background_ff = None
+
+        if not os.path.exists(background_coeff):
+            background_coeff = None
 
         return {
             'modelA': 0,
