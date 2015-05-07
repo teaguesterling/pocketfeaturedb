@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# PocketFEATURE is best installed inside of a virtualenv and made much
+# easier on a system with pip. If these are not easily available on your
+# system though a package manager, this script can bootstrap your envirionment
+
+# Steps:
+# 1) Download PIP installer
+# 2) Install PIP (requires admininstrator access)
+# 3) Install virtualenv (requires administrator access)
+
+echo "Downloading PIP installer from  https://bootstrap.pypa.io/get-pip.py" 1>&2
+curl https://bootstrap.pypa.io/get-pip.py -o /tmp/git-pip.py
+
+echo "Installing pip (as administrator)" 1>&2
+sudo python /tmp/git-pip.py
+
+echo "Installing virtualenv via pip (as administrator)" 1>&2
+sudo pip install virtualenv

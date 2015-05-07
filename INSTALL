@@ -35,42 +35,70 @@ if [ ! -z "$1" ]; then
 	ALIGN="--alignment ${1}.align"
 fi
 
+if [ ! $( which pip ) ]; then
+	echo "ERROR: pip not available!"
+	echo "Consider running or reading PREINSTALL first"
+	echo "Aborting..."
+	exit 1
+fi
+
 echo "Cleaning up old versions"
 pip uninstall pyFEATURE PocketFEATURE
 
 set -e
 
+if [ -z "$VIRTUAL_ENV" ]; then
+	echo "WARNING: no virtualenv detected! It may be risky to proceed"
+	echo -n "Would you like to create one in ~/pocketfeature now? (y/n)"
+	read CREATE
+	if [ "$CREATE" == "y" ]; then
+		echo "Creating ~/pocketfeature"
+		virtualenv ~/pocketfeature
+		source ~/pocketfeature/bin/activate
+	elif [ "$CREATE" == "n" ]; then
+		echo "Proceeding without any virtualenv"
+	else
+		echo "$CREATE is an invalid selection"
+		echo "Please run the installer again with a valid selection"
+		exit 2
+	fi
+fi
+
 if [ ! -z "$VIRTUAL_ENV" -a ! -d $VIRTUAL_ENV/lib/python?.?/site-packages/numpy/core/include ]; then
-    echo "Fixing Numpy/Virtualenv issues"
-    pip install --force-reinstall --upgrade numpy
+	echo "Fixing Numpy/Virtualenv issues"
+	pip install --force-reinstall --upgrade numpy
 fi
 
 echo "Checking for FEATURE"
 if [ ! $( which featurize ) ]; then
-    echo "Warning: featurize not found in PATH. Likely to fail"
-    echo "Press Enter to continue..."
-    read
+	echo "Warning: featurize not found in PATH!"
+	echo "PocketFEATURE will attempt to guess but may fail"
+	echo "Press Enter to continue..."
+	read
 fi
 
 echo "Checking FEATURE environment"
 if [ -z "$FEATURE_DIR" ]; then
-    echo "Warning: FEATURE_DIR not set. PocketFEATURE will try to guess"
-    echo "Note: This can also be solved by calling PocketFEATURE programs"
-    echo "      with the --feature-dir argument"
-    echo "Press Enter to continue..."
-    read
+	echo "Warning: FEATURE_DIR not set. PocketFEATURE will try to guess..."
+	if [ ! -d /usr/local/feature ]; then
+		echo "This can be solved by either:"
+		echo " a) Installing feature in the default location (/usr/local/feature)"
+		echo " b) Calling PocketFEATURE with --feature-dir explicitly"
+		echo "Press Enter to continue..."
+		read
+	else
+		echo "Found FEATURE in the default location"
+	fi
 fi
     
 
 echo "INSTALLING pyFEATURE"
 cd pyFEATURE
-rm -vrf *.egg-info
 python setup.py install
 cd ../
 
 echo "INSTALLING PocketFEATURE"
 cd PocketFEATURE
-rm -vrf *.egg-info
 python setup.py install
 cd ../
 
