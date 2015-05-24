@@ -84,8 +84,8 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
         job_files['dssp_dir'] = params['dssp_dir']
 
     task = ComparePockets.from_params(
-        modelA=None,
-        modelB=None,
+        modelA=0,
+        modelB=0,
         chainA=None,
         chainB=None,
         ligandA=params['ligandA'],  # Extract positive ligands if specified
