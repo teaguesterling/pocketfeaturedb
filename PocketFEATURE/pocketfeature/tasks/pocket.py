@@ -32,10 +32,13 @@ from pocketfeature.tasks.core import Task
 def focus_structure(structure, model=0, chain=None):
     focus = structure
     if model is not None:
-        models = structure.get_list()
-        found = [m for m in models if m.get_id() == model]
+        models = list(structure.get_list())
+        found = [m for m in models if m.get_id() == model or m.get_id() == int(model)]
         if len(found) == 0:
-            raise ValueError("Model {0} not found in {1}".format(model, structure))
+            if model in (0, '0') and len(models) == 1:
+                model = models[0]
+            else:
+                raise ValueError("Model {0!r} not found in {1}".format(model, structure))
         elif len(found) > 1:
             raise ValueError("Model {0} ambigous in {1}".format(model, structure))
         else:
@@ -164,7 +167,9 @@ class PocketFinder(Task):
     def run(self):
         params = self.params
         if params.pdbid is None:
-            params.pdbid, params.pdb = guess_pdbid_from_stream(params.pdb)
+            params.pdbid, pdb = guess_pdbid_from_stream(params.pdb)
+        else:
+            pdb = params.pdb
 
         if params.model == -1:
             model_id = None
@@ -175,7 +180,7 @@ class PocketFinder(Task):
         else:
             chain_id = params.chain
 
-        structure = pdbfile.load(params.pdb, pdbid=params.pdbid)
+        structure = pdbfile.load(pdb, pdbid=params.pdbid)
         structure = focus_structure(structure, model=model_id, chain=chain_id)
 
         ligand = params.ligand

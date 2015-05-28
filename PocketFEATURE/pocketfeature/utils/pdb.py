@@ -67,14 +67,17 @@ def extract_header_from_stream(stream):
     # Split the stream, assuming metadata is at the beginning
     # (Keep only the group data, i)
     grouping = itertools.groupby(stream, key=lambda line: line.startswith('HEADER    '))
-    grouping = itertools.imap(operator.itemgetter(1), grouping)
 
     # We need to strictly consume all the group members here or
     # they will be lost to the groupby iterator process
-    header_lines = list(next(grouping))
-    body = IteratorIO(next(grouping))
-
-    pdbid = title = date= None
+    has_header, lines = next(grouping)
+    if has_header:
+        header_lines = list(lines)
+        body = list(next(grouping))[1]
+    else:
+        header_lines = []
+        body = lines
+    pdbid = title = date = None
     if len(header_lines) > 0:
         header = header_lines[0].strip()
         pdbid = header[-4:]
@@ -83,6 +86,7 @@ def extract_header_from_stream(stream):
             date = header[-18:-7].strip()
         except IndexError:
             pass
+    body = IteratorIO(body)
     return (title, date, pdbid), body
 
 
@@ -93,10 +97,15 @@ def guess_pdbid_from_stream(stream):
         pdbid = base
     else:
         try:
-            header, stream = extract_header_from_stream(stream)
+            if hasattr(stream, 'seek'):
+                header, _ = extract_header_from_stream(stream)
+                stream.seek(0)
+            else:
+                header, stream = extract_header_from_stream(stream)
             pdbid = header[2]
         except IndexError:
             pdbid = None
+        
     if pdbid is None:
         pdbid = 'UNKN'
     return pdbid, stream

@@ -41,7 +41,7 @@ class FileType(argparse.FileType):
         if wrapper is None:
             wrapper = lambda s: s
         self._wrapper = wrapper
-        self._opener = open
+        self._opener = opener
         self._extraargs = extraargs
 
     def __call__(self, string):
@@ -81,7 +81,7 @@ class ProteinFileType(FileType):
 
     def __call__(self, string):
         if string == '-':
-            stream = super(FileType, self).__call__(string)
+            stream = super(ProteinFileType, self).__call__(string)
         try:
             located = self.locate(string)
             stream = self._opener(located, self._mode, **self._extraargs)

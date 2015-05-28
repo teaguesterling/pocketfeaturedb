@@ -416,7 +416,7 @@ class ComparePockets(Task):
                                          nargs='?',
                                          help='PDB Model to use from PDB B [default: <first>]')
         parser.add_argument('--chainA', metavar='CHAINID',
-                                         type=int,
+                                         type=str,
                                          nargs='?',
                                          help='Chain to restrict pocket to from PDB A [default: <any>]')
         parser.add_argument('--chainB', metavar='CHAINID',

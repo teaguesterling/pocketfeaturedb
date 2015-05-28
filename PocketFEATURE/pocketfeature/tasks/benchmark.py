@@ -289,10 +289,17 @@ class BenchmarkPocketFeatureBackground(Task):
                     for pdbA, pdbB in pairs]
 
         if self.params.num_processors is not None and self.params.num_processors > 1:
+            # Run the first in parallel for cache stability
+            first_args, all_args = all_args[0], all_args[1:]
+            first_score = _run_pf_comparison_star(first_args)
+
             self.pool = multiprocessing.Pool(self.params.num_processors)
             async_results = self.pool.imap_unordered(_run_pf_comparison_star, all_args)
             # Create a wrapper to ensure we don't prematurely exit
             all_scores = ensure_all_imap_unordered_results_finish(async_results, expected=num_comps)
+
+            # Mix back in
+            all_scores = itertools.chain([first_score], all_scores)
         else:
             all_scores = itertools.imap(_run_pf_comparison_star, all_args)
 
