@@ -6,6 +6,7 @@ import itertools
 import os
 
 from pocketfeature.algorithms import (
+    cutoff_dice_similarity,
     cutoff_tanimoto_similarity, 
     cutoff_tversky22_similarity,
     Indexer,
@@ -16,7 +17,10 @@ from pocketfeature.io import (
     featurefile,
     matrixvaluesfile,
 )
-from pocketfeature.io.backgrounds import make_allowed_pair_sets
+from pocketfeature.io.backgrounds import (
+    ALLOWED_SIMILARITY_METRICS,
+    make_allowed_pair_sets,
+)
 from pocketfeature.io.matrixvaluesfile import PassThroughItems
 
 from pocketfeature.tasks.core import Task
@@ -26,10 +30,7 @@ class FeatureFileCompare(Task):
     BACKGROUND_FF_DEFAULT = 'background.ff'
     BACKGROUND_COEFF_DEFAULT = 'background.coeffs'
 
-    COMPARISON_METHODS = {
-        'tanimoto': cutoff_tanimoto_similarity,
-        'tversky22': cutoff_tversky22_similarity,
-    }
+    COMPARISON_METHODS = ALLOWED_SIMILARITY_METRICS.copy()
 
     def run(self):
         params = self.params

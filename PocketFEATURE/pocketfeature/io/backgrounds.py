@@ -12,6 +12,7 @@ from six.moves import filter
 
 from pocketfeature.io import featurefile
 from pocketfeature.algorithms import (
+    cutoff_dice_similarity,
     cutoff_tanimoto_similarity, 
     cutoff_tversky22_similarity,
     normalize_score,
@@ -65,6 +66,7 @@ ALLOWED_VECTOR_TYPE_PAIRS = {
 }
 
 ALLOWED_SIMILARITY_METRICS = {
+    'dice': cutoff_dice_similarity,
     'tanimoto': cutoff_tanimoto_similarity,
     'tversky22': cutoff_tversky22_similarity,
 }

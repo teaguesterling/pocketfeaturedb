@@ -168,8 +168,30 @@ def bulk_cutoff_tversky22_similarity(cutoffs, a, bs):
     return scores
 
 
-@cutoff_tversky22_similarity.override_batch_similarity
-def bulk_cutoff_tversky22_similarity(cutoffs, a, bs):
+@parameterized_feature_coefficient
+def cutoff_dice_similarity(cutoffs, a, b):
+    """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
+        This method takes two vectors and treats each pair of elments matched
+        they differ by less than the supplied cutoff for that index.
+        The number matched elements is then divided by the total number of
+        elements "present" (e.g. non-zero) and this value returned as 
+        the score.
+        If zeroed is false, the elements also need the same sign.
+    """
+    union = np.logical_or(a != 0, b != 0)
+    union_size = np.count_nonzero(union)
+    shared = union
+    if union_size > 0:
+        delta = np.abs(a[shared] - b[shared])
+        intersection = delta < cutoffs[shared]
+        intersection_size = np.count_nonzero(intersection)
+        return (2.0 * intersection_size) / (union_size - intersection_size)
+    else:
+        return 0.
+
+
+@cutoff_dice_similarity.override_batch_similarity
+def bulk_cutoff_dice_similarity(cutoffs, a, bs):
     n = len(bs)
     unions = np.logical_or(a !=0, bs != 0)
     a_repeat = np.repeat(a[np.newaxis], n, axis=0)
@@ -179,7 +201,7 @@ def bulk_cutoff_tversky22_similarity(cutoffs, a, bs):
     union_sizes = unions.sum(axis=1)
     intersection_sizes = intersections.sum(axis=1)
     old_error_settings = np.seterr(divide='ignore')
-    scores = intersection_sizes / (2. * union_sizes - intersection_sizes)
+    scores = (2.0 * intersection_sizes) / (union_sizes - intersection_sizes)
     scores[~np.isfinite(scores)] = 0.
     np.seterr(**old_error_settings)
     return scores

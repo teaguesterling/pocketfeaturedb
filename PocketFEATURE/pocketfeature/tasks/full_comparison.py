@@ -9,11 +9,6 @@ from feature.io import (
 )
 from feature.io.common import open_compressed
 
-from pocketfeature.algorithms import (
-    cutoff_tanimoto_similarity,
-    cutoff_tversky22_similarity,
-)
-
 from pocketfeature.io import (
     backgrounds,
     featurefile,
@@ -39,10 +34,6 @@ from pocketfeature.utils.pdb import guess_pdbid_from_stream
 
 from pocketfeature.utils.args import LOG_LEVELS
 from pocketfeature.tasks.core import Task
-
-
-#compute_raw_cutoff_similarity = cutoff_tversky22_similarity
-#compute_alignment = align_scores_only_best
 
 
 def load_points(pdb_file,

@@ -27,6 +27,7 @@ from feature.io.locate_files import (
 )
 
 from pocketfeature.algorithms import (
+    cutoff_dice_similarity,
     cutoff_tanimoto_similarity,
     cutoff_tversky22_similarity,
     GaussianStats,
@@ -61,9 +62,6 @@ from pocketfeature.utils.pdb import guess_pdbid_from_stream
 
 NUM_DIGITS_FOR_MODE = 3
 BG_COEFFS_COLUMNS = ('mode', 'mean', 'std_dev', 'n', 'min', 'max')
-
-
-default_raw_cutoff_similarity = cutoff_tversky22_similarity
 
 
 @contextlib.contextmanager
@@ -236,7 +234,7 @@ def _featurize_point_stream_star(args):
 
 
 def calculate_residue_pair_normalization(key, thresholds, fileA, fileB, storeFile=None, compare_method=None):
-    compute_raw_cutoff_similarity = ALLOWED_SIMILARITY_METRICS.get(compare_method, default_raw_cutoff_similarity)
+    compute_raw_cutoff_similarity = ALLOWED_SIMILARITY_METRICS[compare_method]
     with gzip.open(fileA) as ioA, \
          gzip.open(fileB) as ioB, \
          maybe_open(storeFile, 'w', gzip.open) as ioStore:

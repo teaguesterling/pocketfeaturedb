@@ -292,6 +292,7 @@ class BenchmarkPocketFeatureBackground(Task):
             # Run the first in parallel for cache stability
             first_args, all_args = all_args[0], all_args[1:]
             first_score = _run_pf_comparison_star(first_args)
+            num_comps -= 1
 
             self.pool = multiprocessing.Pool(self.params.num_processors)
             async_results = self.pool.imap_unordered(_run_pf_comparison_star, all_args)
