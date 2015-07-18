@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
-from six import (
-    string_types,
-    StringIO,
-)
+from six import string_types
 from numpy.linalg import norm
 from Bio.PDB.NeighborSearch import NeighborSearch
 
@@ -22,7 +19,6 @@ from pocketfeature.utils.pdb import (
     find_residues_by_id,
     guess_pdbid_from_stream,
     is_het_residue,
-    is_ligand_residue,
     list_ligands,
 )
 
@@ -31,8 +27,9 @@ from pocketfeature.tasks.core import Task
 
 def focus_structure(structure, model=0, chain=None):
     focus = structure
+    models = list(structure.get_list())
+    chains = list(structure.get_chains())
     if model is not None:
-        models = list(structure.get_list())
         found = [m for m in models if m.get_id() == model or m.get_id() == int(model)]
         if len(found) == 0:
             if model in (0, '0') and len(models) == 1:
@@ -45,13 +42,11 @@ def focus_structure(structure, model=0, chain=None):
             focus = found[0]
 
         if chain is not None:
-            chains = focus.get_list()
-    elif chain is not None:
-        chains = focus.get_chains()
+            chains = list(focus.get_list())
 
     if chain is not None:
         if isinstance(chain, int):
-            found = [list(chains)[chain]]
+            found = [chains[chain]]
         else:
             found = [c for c in chains if c.get_id() == chain]
         if len(found) == 0:
@@ -78,7 +73,7 @@ def find_neighboring_residues_and_points(structure, queries, cutoff=6.0,
         found = [res for res in found if not excluded(res) and res not in picked]
         if residue_centers is None:  # If adding any points
             picked.add(found)
-            residues.update(found)
+            residues.extend(found)
         else:  # Check if any active sites are within cutuff
             for residue in found:
                 centers = residue_centers(residue, skip_partial_residues=skip_partial_residues,
@@ -237,7 +232,6 @@ class PocketFinder(Task):
     def arguments(cls, stdin, stdout, stderr, environ, task_name):
         from argparse import ArgumentParser
         from pocketfeature.utils.args import (
-            decompress,
             FileType,
             ProteinFileType,
         )

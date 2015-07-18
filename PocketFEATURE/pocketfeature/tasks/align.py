@@ -1,70 +1,53 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
-import itertools
-
-from pocketfeature.algorithms import (
-    greedy_align,
-    munkres_align,
-    only_best_align,
-    scale_score_to_alignment_evalue,
-    scale_score_to_alignment_tanimoto,
-    scale_score_none,
-)
+from pocketfeature.algorithms import filter_scores
 from pocketfeature.io import matrixvaluesfile
+from pocketfeature.io.backgrounds import (
+    ALLOWED_ALIGNMENT_METHODS as _ALLOWED_ALIGNMENT_METHODS,
+    ALLOWED_SCALE_FUNCTIONS,
+)
 from pocketfeature.io.matrixvaluesfile import MatrixValues
 from pocketfeature.tasks.core import Task
 
 
-def align_scores_munkres(scores, cutoff):
-    filtered_scores = ((k, v) for k, v in scores.items() if v <= cutoff)
-    score_matrix = MatrixValues(filtered_scores).to_array(default=float('inf'))
-    aligned = munkres_align(score_matrix, shift_negative=True, maximize=False)
-    aligned_scores = scores.subset_from_indexes(aligned)
-    return aligned_scores
+ALLOWED_ALIGNMENT_METHODS = _ALLOWED_ALIGNMENT_METHODS.copy()
+_original_munkres = ALLOWED_ALIGNMENT_METHODS.get('munkres')
+if callable(_original_munkres):
+    def munkres_special_case(scores):
+        matrix = scores.to_array(default=float('inf'))
+        aligned_matrix = _original_munkres(matrix, shift_negative=True, maximize=False)
+        aligned = scores.subset_from_indexes(aligned_matrix).items()
+        return aligned
+    ALLOWED_ALIGNMENT_METHODS['munkres'] = munkres_special_case
 
 
-def align_scores_greedy(scores, cutoff):
-    filtered_scores = ((k, v) for k, v in scores.items() if v <= cutoff)
-    filtered = MatrixValues(filtered_scores)
-    aligned = MatrixValues(greedy_align(filtered))
-    return aligned
-
-
-def align_scores_only_best(scores, cutoff):
-    filtered_scores = ((k, v) for k, v in scores.items() if v <= cutoff)
-    filtered = MatrixValues(filtered_scores)
-    aligned = MatrixValues(only_best_align(filtered))
-    return aligned
+def align_scores(method, scores, cutoff):
+    filtered_scores = filter_scores(scores, cutoff=cutoff)
+    score_matrix = MatrixValues(filtered_scores)
+    aligned = method(score_matrix)
+    alignment_matrix = MatrixValues(aligned)
+    return alignment_matrix
 
 
 class AlignScores(Task):
     DEFAULT_CUTOFF = -0.15
     DEFAULT_COLUMN = 1  # Normalized in 2nd column
-    ALIGNMENT_METHODS = {
-        'greedy': align_scores_greedy,
-        'munkres': align_scores_munkres,
-        'onlybest': align_scores_only_best,
-    }
-    SCALE_METHODS = {
-        'none': scale_score_none,
-        'tanimoto': scale_score_to_alignment_tanimoto,
-        'evalue': scale_score_to_alignment_evalue,
-    }
+
 
     def run(self):
         params = self.params
-        align = self.ALIGNMENT_METHODS[params.method]
-        scale = self.SCALE_METHODS[params.scale_method]
+        align_fn = ALLOWED_ALIGNMENT_METHODS[params.method]
+        scale_fn = ALLOWED_SCALE_FUNCTIONS[params.scale_method]
         columns = [params.score_column]
         scores = matrixvaluesfile.load(params.scores, columns=columns, cast=float)
-        alignment = align(scores, params.cutoff)
+        alignment = align_scores(align_fn, scores, params.cutoff)
         nA, nB = map(len, scores.indexes)
         num_total_points = len(scores)
         num_aligned_points = len(alignment)
         matrixvaluesfile.dump(alignment, params.output)
         raw_score = sum(alignment.values())
-        scaled_score = scale(nA, nB, num_aligned_points, raw_score)
+        scaled_score = scale_fn(nA, nB, num_aligned_points, raw_score)
         print("Points\t{0}".format(num_total_points), file=params.log)
         print("Aligned\t{0}".format(num_aligned_points), file=params.log)
         print("Raw\t{0:0.5f}".format(raw_score), file=params.log)
@@ -73,6 +56,7 @@ class AlignScores(Task):
 
     @classmethod
     def defaults(cls, stdin, stdout, stderr, enviorn):
+        from pocketfeature.utils.args import decompress
         return {
             'scores': decompress(stdin),
             'cutoff': cls.DEFAULT_CUTOFF,
@@ -86,10 +70,8 @@ class AlignScores(Task):
     @classmethod
     def arguments(cls, stdin, stdout, stderr, environ, task_name):
         from argparse import ArgumentParser
-        from pocketfeature.utils.args import (
-            decompress,
-            FileType,
-        )
+        from pocketfeature.utils.args import FileType
+
         parser = ArgumentParser("Align scores from a PocketFEATURE score matrix")
         parser.add_argument('scores', metavar='SCOREFILE', 
                                       type=FileType.compressed('r'),
@@ -101,10 +83,10 @@ class AlignScores(Task):
                                                     type=int,
                                                     help='Value column index in score file to use for aligning [default: 1]')
         parser.add_argument('-m', '--method', metavar='ALIGN_METHOD',
-                                      choices=cls.ALIGNMENT_METHODS,
+                                      choices=ALLOWED_ALIGNMENT_METHODS.keys(),
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
         parser.add_argument('-S', '--scale-method', metavar='SCALE_METHOD',
-                                      choices=cls.SCALE_METHODS,
+                                      choices=ALLOWED_SCALE_FUNCTIONS.keys(),
                                       help="Method to re-scale score based on pocket sizes (one of: %(choices)s) [default: %(default)s]")
         parser.add_argument('-o', '--output', metavar='VALUES',
                                               type=FileType.compressed('w'),
@@ -118,5 +100,5 @@ class AlignScores(Task):
 
 if __name__ == '__main__':
     import sys
-    sys.exit(AlignScore.run_as_script())
+    sys.exit(AlignScores.run_as_script())
 

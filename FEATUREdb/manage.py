@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
-import sys
-import subprocess
+
 from flask.ext.migrate import MigrateCommand
 from flask.ext.script import (
     Manager,
@@ -12,7 +11,6 @@ from flask.ext.script import (
 
 from featuredb.app import create_app
 from featuredb.data import models
-
 from featuredb.extensions import db
 from featuredb.settings import (
     Development,
@@ -51,7 +49,6 @@ def test():
     exit_code = pytest.main(['tests', '--verbose'])
     return exit_code
 
-manager.add_command('server', Server())
 manager.add_command('shell', Shell(make_context=_make_context))
 manager.add_command('db', MigrateCommand)
 

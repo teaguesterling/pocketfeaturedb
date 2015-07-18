@@ -7,12 +7,8 @@ import itertools
 import logging
 import multiprocessing
 import os
-import sys
 import random
-from six import (
-    string_types,
-    StringIO,
-)
+from six import string_types
 
 from feature.backends.external import generate_dssp_file 
 from feature.backends.wrappers import featurize_points_raw
@@ -21,18 +17,11 @@ from feature.io import (
     pointfile,
 )
 from feature.io.locate_files import (
-    pdbidFromFilename,
     find_pdb_file,
     find_dssp_file,
 )
 
-from pocketfeature.algorithms import (
-    cutoff_dice_similarity,
-    cutoff_tanimoto_similarity,
-    cutoff_tversky22_similarity,
-    GaussianStats,
-    unique_product,
-)
+from pocketfeature.algorithms import GaussianStats
 from pocketfeature.io import (
     backgrounds,
     featurefile as featurefile_pf,
@@ -58,7 +47,6 @@ from pocketfeature.tasks.pocket import (
 )
 from pocketfeature.utils.args import LOG_LEVELS
 from pocketfeature.utils.ff import get_vector_type
-from pocketfeature.utils.pdb import guess_pdbid_from_stream
 
 NUM_DIGITS_FOR_MODE = 3
 BG_COEFFS_COLUMNS = ('mode', 'mean', 'std_dev', 'n', 'min', 'max')
@@ -202,10 +190,10 @@ def get_pdb_list(pdb_src, pdb_dir=None, log=logging, fail_on_missing=True):
             found.append(pocket_data)
         except ValueError:
             if fail_on_missing:
-            	log.error("Could not find PDB: {0}".format(pdbid))
+                log.error("Could not find PDB: {0}".format(pdbid))
                 raise
             else:
-            	log.warning("Could not find PDB: {0}".format(pdbid))
+                log.warning("Could not find PDB: {0}".format(pdbid))
   
     return found
 
@@ -223,9 +211,11 @@ def get_ptf_list(ptf_src, log=logging):
     return ptf_locs
 
 
-def featurize_point_stream(points, featurize_args={}, load_args={}):
+def featurize_point_stream(points, featurize_args=None, load_args=None):
+    featurize_args = featurize_args or {}
+    load_args = load_args or {}
     results = featurize_points_raw(points, **featurize_args)
-    ff = featurefile_pf.iload(results)
+    ff = featurefile_pf.iload(results, **load_args)
     return ff
 
 
@@ -378,6 +368,8 @@ class GeneratePocketFeatureBackground(Task):
                 self._num_pdbs = len(ptfs)
                 log.info("Found {0} Point Files".format(self._num_pdbs))
                 vectors = self.get_pointfile_vectors(ptfs)
+            else:
+                raise RuntimeError("Could not load points")
 
             stats, metadata, pdbs = self.process_vectors(vectors)
             bg = create_background_features_from_stats(stats,
@@ -484,6 +476,7 @@ class GeneratePocketFeatureBackground(Task):
                 name = pocket.signature_string
             else:
                 num_failed += 1
+                name = "Unknown"
             if self.params.progress:
                 print("\r{0} of {1} PDBs processed ({2} successful, {3} failed) ({4})".format(
                             idx, 
@@ -523,7 +516,8 @@ class GeneratePocketFeatureBackground(Task):
     def get_pocket_vectors(self, pocket_defs):
         if self.params.max_points is not None:
             self.log.info("Shuffling PDBs since max_points specified")
-            random.shuffle(pdbs)
+            random.shuffle(pocket_defs)
+            pocket_defs = pocket_defs[:self.params.max_points]
         pockets = self.get_pockets(pocket_defs)
         points = self.get_points(pockets)
         vectors = self.create_vectors(points)
@@ -540,7 +534,6 @@ class GeneratePocketFeatureBackground(Task):
         for vector in self.featurize_points(points):
             self._num_vectors += 1
             yield vector
-        
 
     # This is a member function as it uses lots of task parameters
     def featurize_points(self, points):
@@ -561,11 +554,10 @@ class GeneratePocketFeatureBackground(Task):
 
         self.log.info("Computing FEATURE vectors")
         if self.params.num_processors is not None and self.params.num_processors > 1 and False:
-            pass
-#            self.log.info("Calculating with {0} workers".format(self.params.num_processors))
-#            args = ((point, featurize_args) for point in points)
-#            pool = multiprocessing.Pool(self.params.num_processors)
-#            vectors = pool.imap(_featurize_point_stream_star, args)
+            self.log.info("Calculating with {0} workers".format(self.params.num_processors))
+            args = ((point, featurize_args) for point in points)
+            pool = multiprocessing.Pool(self.params.num_processors)
+            vectors = pool.imap(_featurize_point_stream_star, args)
         else:
             if self.params.num_processors is not None and self.params.num_processors > 1:
                 self.log.warning("Parallel FEATURE vector calculation not yet implemented")
@@ -701,10 +693,7 @@ class GeneratePocketFeatureBackground(Task):
 
     @classmethod
     def arguments(cls, stdin, stdout, stderr, environ, task_name):
-        from argparse import (
-            ArgumentParser,
-            FileType,
-        )
+        from argparse import ArgumentParser
         from pocketfeature.utils.args import FileType
 
         if 'PDB_DIR' in os.environ:
@@ -804,4 +793,4 @@ class GeneratePocketFeatureBackground(Task):
 
 if __name__ == '__main__':
     import sys
-    sys.exit(FeatureFileCompare.run_as_script())
+    sys.exit(GeneratePocketFeatureBackground.run_as_script())

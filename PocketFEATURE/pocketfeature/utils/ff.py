@@ -20,9 +20,9 @@ def residue_to_typecode(residue, index=1):
     return "{0}{1}".format(resletter, index)
 
 
-def typecode_from_comment(comment):
+def typecode_from_comment(comment, typecode_idx=-1):
     tokens = comment.split()
-    return tokens[-1]
+    return tokens[typecode_idx]
 
 
 def get_vector_description(vector, comment_field=DESCRIPTION):
@@ -32,6 +32,22 @@ def get_vector_description(vector, comment_field=DESCRIPTION):
         return description
     except ValueError:
         return vector.name
+
+
+def get_point_signature(point, signature_idx=0):
+    signature = point.comment.split()[signature_idx]
+    return signature
+
+
+def get_pocket_signature(pocket, signature_idx=0, signature_parts=4, delimiter='_'):
+    if len(pocket) < 1:
+        raise ValueError("No signature for empty pocket")
+    point = pocket[0]
+    point_signature = get_point_signature(point, signature_idx=signature_idx)
+    parts = point_signature.strip(delimiter).split(delimiter)
+    signature = delimiter.join(parts[:signature_parts])
+    return signature
+
 
 
 def vectors_descriptions_in_file(feature_file, comment_field=DESCRIPTION):

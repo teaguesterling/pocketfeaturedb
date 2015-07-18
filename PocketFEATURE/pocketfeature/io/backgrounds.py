@@ -4,14 +4,14 @@
 #TODO: Integrate this with residue definition files
 
 import itertools
-from six import (
-    string_types,
-    StringIO,
-)
+from six import string_types
 from six.moves import filter
 
 from pocketfeature.io import featurefile
 from pocketfeature.algorithms import (
+    greedy_align,
+    munkres_align,
+    only_best_align,
     cutoff_dice_similarity,
     cutoff_tanimoto_similarity, 
     cutoff_tversky22_similarity,
@@ -19,6 +19,8 @@ from pocketfeature.algorithms import (
     scale_score_none,
     scale_score_fitted_zscore,
     scale_score_fitted_evd,
+    scale_score_to_alignment_tanimoto,
+    scale_score_to_alignment_evalue,
 )
 from pocketfeature.io.featurefile import PocketFeatureBackgroundMetaData
 from pocketfeature.io import matrixvaluesfile
@@ -71,8 +73,16 @@ ALLOWED_SIMILARITY_METRICS = {
     'tversky22': cutoff_tversky22_similarity,
 }
 
+ALLOWED_ALIGNMENT_METHODS = {
+    'greedy': greedy_align,
+    'munkres': munkres_align,
+    'onlybest': only_best_align,
+}
+
 ALLOWED_SCALE_FUNCTIONS = {
     'none': scale_score_none,
+    'tanimoto': scale_score_to_alignment_tanimoto,
+    'evalue': scale_score_to_alignment_evalue,
     'fitted-z': scale_score_fitted_zscore,
     'fitted-evd': scale_score_fitted_evd,
 }
@@ -189,7 +199,7 @@ class BackgroundEnvironment(object):
     def normalizations(self):
         return self._normalizations
 
-    def scale_alignment_score(sizes, score):
+    def scale_alignment_score(self, sizes, score):
         return self._scale_fn(self._scale_params, sizes, score)
 
 

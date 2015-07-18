@@ -1,16 +1,11 @@
 #!/usr/bin/env pythoe
 from __future__ import print_function
 
-import gzip
 import itertools
 import logging
 import multiprocessing
-import operator
 import os
 import shutil
-import sys
-import time
-import random
 from six import (
     string_types,
     StringIO,
@@ -24,10 +19,7 @@ from pocketfeature.io import (
     matrixvaluesfile,
     backgrounds,
 )
-from pocketfeature.io.matrixvaluesfile import (
-    MatrixValues,
-    PassThroughItems,
-)
+from pocketfeature.io.matrixvaluesfile import PassThroughItems
 from pocketfeature.tasks.core import (
     Task,
     ensure_all_imap_unordered_results_finish,
@@ -53,7 +45,10 @@ def run_pf_comparison(root, pdbA, pdbB, cutoffs, params):
     comp_dir = os.path.join(root, token)
     os.makedirs(comp_dir)
 
+    # Fix issue with six and PyLint
+    # noinspection PyCallingNonCallable
     buf = StringIO()
+
     job_files = {
         'pdbA': open_compressed(pdbA),
         'pdbB': open_compressed(pdbB),
@@ -226,7 +221,7 @@ class BenchmarkPocketFeatureBackground(Task):
                 log.debug("Creating directory {0}".format(params.bench_dir))
                 os.makedirs(params.bench_dir)
         if not os.path.exists(cache_dir):
-	        os.makedirs(cache_dir)
+            os.makedirs(cache_dir)
 
                 
         self.positive_stats = self.compare_positives()
@@ -357,33 +352,29 @@ class BenchmarkPocketFeatureBackground(Task):
     def record_scores(self, scores, output, scaled_output):
         if scaled_output is None:
             scaled_output = os.devnull
-        with open(output, 'w') as f, open(scaled_output, 'w') as g:
+        with open(output, 'w') as f,\
+             open(scaled_output, 'w') as g:
             for item in scores:
                 if len(item) == 4:
                     key, sizes, values, scaled = item
                 else:
                     key = 'Unknown', 'Unknown'
-                    values = None
-                if values is None:
                     self.failed_scores += 1
                     self.log.debug("Failure to compare {0}".format(":".join(key)))
-                else:
-                    self.successful_scores += 1
-                    row = tuple(sizes) + tuple(values)
-                    scaled_row = tuple(sizes) + tuple(scaled)
-                    passthough = PassThroughItems([(key, row)])
-                    matrixvaluesfile.dump(passthough, f)
-                    passthough = PassThroughItems([(key, scaled_row)])
-                    matrixvaluesfile.dump(passthough, g)
-                    yield item
-            
+                    continue
+
+                self.successful_scores += 1
+                row = tuple(sizes) + tuple(values)
+                scaled_row = tuple(sizes) + tuple(scaled)
+                passthough = PassThroughItems([(key, row)])
+                matrixvaluesfile.dump(passthough, f)
+                passthough = PassThroughItems([(key, scaled_row)])
+                matrixvaluesfile.dump(passthough, g)
+                yield item
 
     @classmethod
     def arguments(cls, stdin, stdout, stderr, environ, task_name):
-        from argparse import (
-            ArgumentParser,
-            FileType,
-        )
+        from argparse import ArgumentParser
         from pocketfeature.utils.args import FileType
 
         if 'PDB_DIR' in os.environ:
@@ -402,10 +393,10 @@ class BenchmarkPocketFeatureBackground(Task):
                                           help='Path to a file containing PDB ids to treat as positives')
         parser.add_argument('controls', metavar='CONTROL',
                                         help='Path to a file containing PDB ids to treat as negatives')
-        parser.add_argument('--pdb-dir', metavar='PDB_DIR', 
+        parser.add_argument('--pdb-dir', metavar='PDB_DIR',
                                          help='Directory to look for PDBs in [default: %(default)s|PDBS]',
                                          default=pdb_dir)
-        parser.add_argument('--dssp-dir', metavar='DSSP_DIR', 
+        parser.add_argument('--dssp-dir', metavar='DSSP_DIR',
                                          help='Directory to look for PDBs in [default: %(default)s|PDBS]',
                                          default=dssp_dir)
         parser.add_argument('-b', '--background', metavar='FEATURESTATS',
@@ -456,10 +447,10 @@ class BenchmarkPocketFeatureBackground(Task):
         parser.add_argument('-r', '--resume', action='store_true',
                                               default=False,
                                               help='Resume with existing files if possible [default: %(default)s]')
-        parser.add_argument('--ff-cache', metavar='FF_CACHE_DIR', 
+        parser.add_argument('--ff-cache', metavar='FF_CACHE_DIR',
                                           help='Directory to cache FEATURE vectors [default: BENCH_DIR/cache]',
                                           default=None)
-        parser.add_argument('--ptf-cache', metavar='PTF_CACHE_DIR', 
+        parser.add_argument('--ptf-cache', metavar='PTF_CACHE_DIR',
                                            help='Directory to cache Point files [default: BENCH_DIR/cache]',
                                            default=None)
         parser.add_argument('-P', '--num-processors', metavar='PROCS',

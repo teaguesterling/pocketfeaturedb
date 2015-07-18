@@ -23,6 +23,7 @@ def _update_value(existing, value):
     if existing is None:
         return value
 
+    existing_type = type(existing)
     if isinstance(existing, CONTAINER_TYPES):
         if not isinstance(value, CONTAINER_TYPES):
             value = [value]
@@ -33,10 +34,9 @@ def _update_value(existing, value):
         elif hasattr(existing, 'update'):
             existing.update(value)
         else:
-            raise ValueError("Can't update container type {}".format(existing_type))
+            raise ValueError("Can't update container type {!r}".format(existing_type))
         return existing
     else:
-        existing_type = type(existing)
         value = existing_type(value)
         return value
 

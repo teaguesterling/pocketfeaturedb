@@ -7,14 +7,13 @@ from collections import (
     defaultdict,
     OrderedDict,
 )
-import functools
 import operator
+import os
 
 from six import string_types
 
 import numpy as np
 from scipy import stats
-from scipy.spatial import distance
 from munkres import Munkres
 
 
@@ -132,7 +131,7 @@ def bulk_cutoff_tanimoto_similarity(cutoffs, a, bs):
 @parameterized_feature_coefficient
 def cutoff_tversky22_similarity(cutoffs, a, b):
     """ Compute the PocketFEATURE tanimoto similarity of two FEATURE vectors
-        This method takes two vectors and treats each pair of elments matched
+        This method takes two vectors and treats each pair of elements matched
         they differ by less than the supplied cutoff for that index.
         The number matched elements is then divided by the total number of
         elements "present" (e.g. non-zero) and this value returned as 
@@ -251,7 +250,7 @@ def scale_score_fitted_zscore(params, sizes, score):
 def scale_score_fitted_evd(params, sizes, score):
     z_params = params[:6]
     evd_params = params[6:]
-    dist = stats.gumbl_r(*evd_params)
+    dist = stats.gumbel_r(*evd_params)
     z_score = scale_score_fitted_zscore(z_params, sizes, score)
     pvalue = dist.pdf(z_score)
     return pvalue
@@ -261,6 +260,12 @@ def unique_product(p, q, skip=0):
     for i, x in enumerate(p, start=skip):
         for y in q[i:]:
             yield x,y
+
+
+def filter_scores(scores, cutoff, wrapper=None):
+    wrapper = wrapper or (lambda x: x)
+    filtered = ((k, v) for k, v in scores.items() if v <= cutoff)
+    return wrapper(filtered)
 
 
 #def munkres(costs, maximize=False):
@@ -533,8 +538,9 @@ class Indexer(defaultdict):
         Provided items must be hashable
     """
 
-    def __init__(self, items=[]):
+    def __init__(self, items=None):
         super(Indexer, self).__init__(lambda: len(self))
+        items = items or []
         self.extend(items)
 
     def extend(self, items):

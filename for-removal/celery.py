@@ -11,11 +11,11 @@ from flask import (
 )
 from flask.ext.celery import *
 from flask.ext.celery import _CeleryState
+
 from .utils import (
     extract_request_environment,
     setup_extracted_request_environment,
 )
-
 
 INJECTED_ENVIRON_KEY = '__flask_celery_request_environ'
 

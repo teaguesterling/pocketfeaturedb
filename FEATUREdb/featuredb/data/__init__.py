@@ -1,4 +1,4 @@
-from drake.utils import set_defaults
+from featuredb.utils import set_defaults
 from . import config
 
 

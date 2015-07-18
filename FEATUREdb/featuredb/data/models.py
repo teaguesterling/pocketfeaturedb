@@ -14,6 +14,7 @@ from .core import (
     Date,
     FeatureVectorType,
     Float,
+    foreign,
     ForeignKey,
     func,
     HSTORE,
@@ -26,11 +27,13 @@ from .core import (
     NULL,
     PointType,
     relationship,
+    remote,
     Sequence,
     String,
     SurrogatePK,
     Table,
     text_type,
+
 )
 
 # TODO Break into modules
@@ -314,7 +317,7 @@ class MicroEnvironmentGroupSource(Model):
     pass
 
 
-class MicroEnvironmentGroup(Model):
+class MicroEnvironmentGroup(Model, SurrogatePK):
     __tablename__ = 'featurevectorset'
 
     FEATURE_VECTOR_SET_TYPE = [
@@ -323,7 +326,6 @@ class MicroEnvironmentGroup(Model):
         (u'I', u'Protein Protein Interface'),
     ]
 
-    id = Column('id', Integer, nullable=False, primary_key=True)
     structure_fk = Column('pdb_fk', String(4), ForeignKey(PDB.pdb), nullable=False, index=True)
 
     name = Column('name', String, default='', server_default='', nullable=False)
@@ -380,7 +382,7 @@ class LigandPocket(MicroEnvironmentGroup):
 #######################################################################################################################
 
 
-class MicroEnvironment(Model):
+class MicroEnvironment(Model, SurrogatePK):
     __tablename__ = 'microenvironment'
 
     MICROENVIRONMENT_ORIGIN_TYPE = [
@@ -392,7 +394,6 @@ class MicroEnvironment(Model):
         (u'O', u'Other Environment'),
     ]
 
-    id = Column('id', Integer, primary_key=True)
     structure_fk = Column('pdb_fk', String(4), ForeignKey(PDB.pdb), index=True)
     name = Column('name', String)
 
@@ -414,10 +415,9 @@ class MicroEnvironment(Model):
     }
 
 
-class ActiveSiteEnvironment(MicroEnvironment):
+class ActiveSiteEnvironment(MicroEnvironment, SurrogatePK):
     __tablename__ = 'activesite_microenvironment'
 
-    id = Column('id', Integer, ForeignKey(MicroEnvironment.id), primary_key=True)
     site_fk = Column('site_fk', Integer, ForeignKey(ActiveSite.id), index=True)
     structure_residue_fk = Column('structure_residue_fk', Integer, ForeignKey(StructureResidue.id), index=True)
 
@@ -510,15 +510,16 @@ class Fragment(Model):
     in_use = Column('in_use', Boolean, nullable=False, default=False, server_default=False, index=True)
 
     children  = relationship(lambda: Fragment,
-                           backref=backref('parent', remote_side=(pubchem_id,)))
+                             primary_join=pubchem_id == remote(foreign(pubchem_id)),
+                             backref=backref('parent', remote_side=(pubchem_id,)))
 
     all_children = relationship(lambda: Fragment,
-                                lazy='joined',
+                                primary_join=pubchem_id == remote(foreign(pubchem_id)),
+                                lazy='dynamic',
                                 join_depth=5,
                                 backref=backref('all_parents',
-                                                lazy='joined',
-                                                join_depth=5,
-                                                remote_side=(pubchem_id,)))
+                                                lazy='dynamic',
+                                                join_depth=5))
 
     def __repr__(self):
         return "<Fragment(pubchem_id={0.pubchem_id!r}, smiles={1!r}, parent_srk={0.parent_srk!r})>"\
@@ -526,6 +527,19 @@ class Fragment(Model):
 
 
 class LigandFragmentAtoms(Model, SurrogatePK):
+    """
+        Required SQL Functions:
+
+        array_to_int_array:
+            CREATE FUNCTION array_to_int_array(anyarray) IMMUTABLE RETURNS integer[] AS $$
+                SELECTARRAY(SELECT CAST( UNNEST($1) AS int) );
+            $$
+            LANGUAGE SQL;
+
+        hstore_array_vals:
+            CREATE FUNCTION hstore_array_vals(hstore[])
+
+    """
     __tablename__ = 'ligand'
 
     ligand_fk = Column('ligand_fk', ForeignKey(Ligand.id), nullable=False)

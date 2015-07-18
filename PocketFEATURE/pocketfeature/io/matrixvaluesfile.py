@@ -9,6 +9,7 @@ import numpy as np
 from six import (
     iteritems,
     StringIO,
+    string_types
 )
 from feature.io import metadata
 
@@ -153,18 +154,18 @@ def load(io, dims=2, delimiter=None,
                      header=False,
                      load_metadata=False):
     if load_metadata:
-        metadata, io = extract_metadata(io)
+        md, io = metadata.extract_metadata(io)
     else:
-        metadata = None
-    if not header and metadata is not None:
-        column_names = metadata.get('COLUMNS')
+        md = None
+    if not header and md is not None:
+        column_names = md.get('COLUMNS')
 
     positions = []
-    indexes = [Indexer() for i in range(dims)]
+    indexes = [Indexer() for _ in range(dims)]
     if header:
         column_names = next(io).split(delimiter)[dims:]
         if columns is not None:
-            columns = [column_names.index(name) if isinstance(column, string_types) else column for column in columns]
+            columns = [column_names.index(col) if isinstance(col, string_types) else col for col in columns]
     else:
         column_names = None
     columns = list(columns) if columns is not None else None

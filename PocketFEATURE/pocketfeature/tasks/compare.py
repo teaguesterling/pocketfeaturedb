@@ -1,26 +1,14 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
-import gzip
-import itertools
 import os
 
-from pocketfeature.algorithms import (
-    cutoff_dice_similarity,
-    cutoff_tanimoto_similarity, 
-    cutoff_tversky22_similarity,
-    Indexer,
-    normalize_score,
-)
 from pocketfeature.io import (
     backgrounds,
     featurefile,
     matrixvaluesfile,
 )
-from pocketfeature.io.backgrounds import (
-    ALLOWED_SIMILARITY_METRICS,
-    make_allowed_pair_sets,
-)
+from pocketfeature.io.backgrounds import ALLOWED_SIMILARITY_METRICS
 from pocketfeature.io.matrixvaluesfile import PassThroughItems
 
 from pocketfeature.tasks.core import Task
@@ -48,10 +36,7 @@ class FeatureFileCompare(Task):
 
     @classmethod
     def arguments(cls, stdin, stdout, stderr, environ, task_name):
-        from argparse import (
-            ArgumentParser,
-            FileType,
-        )
+        from argparse import ArgumentParser
         from pocketfeature.utils.args import FileType
 
         background_ff = cls.BACKGROUND_FF_DEFAULT

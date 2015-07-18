@@ -2,7 +2,6 @@
 from __future__ import print_function
 
 import os
-import sys
 
 try:
     from feature.backends.wrappers import featurize_points_raw
@@ -14,7 +13,9 @@ from pocketfeature.io import featurefile
 from pocketfeature.tasks.core import Task
 
 
-def featurize_points(pointslist, featurize_args={}, featurefile_args={}):
+def featurize_points(pointslist, featurize_args=None, featurefile_args=None):
+    featurize_args = featurize_args or {}
+    featurefile_args = featurefile_args or {}
     data = featurize_points_raw(pointslist, **featurize_args)
     ff = featurefile.load(data, **featurefile_args)
     return ff
@@ -77,16 +78,13 @@ class Featurize(Task):
             featurize(*args, **kwargs)
             return 0
         except Exception as e:
-            raise
+            self.log.error(str(e))
             return -1
 
     @classmethod
     def arguments(cls, stdin, stdout, stderr, environ, task_name):
         from argparse import ArgumentParser
-        from pocketfeature.utils.args import (
-            decompress,
-            FileType,
-        )
+
         parser = ArgumentParser("Call featurize in a custom environment")
         parser.add_argument('pdb', metavar='PDB', nargs='?', default=None)
         parser.add_argument('-P', metavar='POINTILE', nargs='?', default=None)

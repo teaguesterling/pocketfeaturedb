@@ -30,9 +30,9 @@ from pocketfeature.tasks.featurize import (
     update_environ_from_namespace,
 )
 from pocketfeature.tasks.visualize import create_alignment_visualizations
-from pocketfeature.utils.pdb import guess_pdbid_from_stream
-
 from pocketfeature.utils.args import LOG_LEVELS
+from pocketfeature.utils.pdb import guess_pdbid_from_stream
+from pocketfeature.utils.ff import get_pocket_signature
 from pocketfeature.tasks.core import Task
 
 
@@ -103,6 +103,7 @@ def generate_featurefile(points,
                          feature_file,
                          feature_cache=None,
                          link_cached=False,
+                         featurize_args=None,
                          environ=os.environ,
                          log=logging,
                          log_label="Pocket"):
@@ -111,26 +112,32 @@ def generate_featurefile(points,
                                                                         cache=feature_cache))
         with open_compressed(feature_cache) as f:
             features = featurefile.load(f)
+            using_cached = True
     else:
         log.debug("FEATURIZING Pocket {label}".format(label=log_label))
+        featurize_args = featurize_args or {}
+        featurize_args.setdefault('environ', environ)
         features = featurize_points(points, 
-                                    featurize_args={
-                                        'environ': environ},
+                                    featurize_args=featurize_args,
                                     featurefile_args={
                                         'rename_from_comment': 'DESCRIPTION'})
+        using_cached = False
+
         if feature_cache is not None:
             log.debug("Caching features {label}".format(label=log_label))
             with open_compressed(feature_cache, 'w') as f:
                 featurefile.dump(features, f)
 
+
     if feature_file is not None:
-        if link_cached:
-            feature_file.close()
+        if using_cached and link_cached:
             original_name = feature_file.name
-            if not os.path.exists(original_name) and os.path.getsize(original_name) == 0:
-                log.debug("Linking to cached features {label}".format(label=log_label))
+            feature_file.close()
+            if os.path.exists(original_name) and os.path.getsize(original_name) == 0:
+                log.debug("Replacing {original} with previously cached".format(original=original_name))
                 os.unlink(original_name)
-                os.symlink(original_cache, original_name)
+            log.debug("Linking to cached features {label}".format(label=log_label))
+            os.symlink(feature_cache, original_name)
         else:
             log.debug("Writing features {label}".format(label=log_label))
             featurefile.dump(features, feature_file)
@@ -220,14 +227,11 @@ class ComparePockets(Task):
         log.info("Extrating pocket names")
         pointsA = list(pointsA)
         pointsB = list(pointsB)
-        first_pointA = pointsA[0]
-        first_pointB = pointsB[0]
-        commentTokensA = first_pointA.comment.split()[0].split('_')
-        commentTokensB = first_pointB.comment.split()[0].split('_')
-        signature_stringA = "_".join(t for i, t in enumerate(commentTokensA)
-                                                if i < 4)
-        signature_stringB = "_".join(t for i, t in enumerate(commentTokensB) 
-                                                if i < 4)
+        try:
+            signature_stringA = get_pocket_signature(pointsA)
+            signature_stringB = get_pocket_signature(pointsB)
+        except (ValueError):
+            return self.COULD_NOT_FIND_POCKET
                               
         log.info("Generating FEATURE vectors")
         ffA_cache_file = None

@@ -11,7 +11,7 @@ from pocketfeature.utils.pdb import (
 
 # Each residue consists of some number of "centers" or active sits
 # Each of which is defined by one or more atoms in the residue
-CENTERS = {
+DEFAULT_CENTER_ATOMS = {
     'GLY': [['CA']],
     'CYS': [['SG']],
     'ARG': [['CZ']],
@@ -37,7 +37,7 @@ CENTERS = {
 }
 
 
-CLASSES = {
+DEFAULT_CLASSES = {
     'positive': (('ARG', 0), ('HIS', 0), ('LYS', 0)),
     'negative': (('ASP', 0), ('GLU', 0)),
     'polar': (('SER', 0), ('THR', 0), 
@@ -51,8 +51,8 @@ CLASSES = {
 }
 
 
-ALL_CENTERS = [(res, idx) for res, sites in CENTERS.items() 
-                          for idx in range(len(sites))]
+ALL_DEFAULT_CENTERS = [(res, idx) for res, sites in DEFAULT_CENTER_ATOMS.items()
+                                  for idx in range(len(sites))]
 
 
 def get_center_code(name, idx):
@@ -60,11 +60,11 @@ def get_center_code(name, idx):
     return "{0}{1}".format(letter, idx+1)
 
 
-def get_center_codes(name, positions=[0]):
-    return [get_center_code(name, i) for i in positions]
+def get_center_codes(name, positions=(0,), get_code=get_center_code):
+    return [get_code(name, i) for i in positions]
 
 
-def get_center_code_set(residues_idx, centers=CENTERS):
+def get_center_code_set(residues_idx, centers=DEFAULT_CENTER_ATOMS):
     return [get_center_code(name, idx) for name, idx in residues_idx]
 
 
@@ -72,20 +72,21 @@ def load(io):
     raise NotImplementedError("Loading of ResiduePoints not yet operational")
 
 
-class CenterCalculator(dict):
-    def __init__(self, centers=CENTERS, 
-                       classes=CLASSES, 
+class CenterCalculator(object):
+    def __init__(self, centers=DEFAULT_CENTER_ATOMS,
+                       classes=DEFAULT_CLASSES,
                        get_key=residue_name,
-                       get_codes=get_center_codes,
+                       get_code=get_center_code,
                        get_name=atom_name,
                        get_point=average_coords,
                        ignore_unknown_residues=True,
                        strict=True):
+        self.calculators = {}
         self.centers = centers
         self.classes = classes
         self.get_key = get_key
         self.normalize_key = str.upper
-        self.get_codes = get_codes
+        self.get_code = get_code
         self.get_name = get_name
         self.get_point = get_point
         self.strict = strict
@@ -94,18 +95,21 @@ class CenterCalculator(dict):
     def __getitem__(self, key):
         key = self.normalize_key(key)
         try:
-            return super(CenterCalculator, self).__getitem__(key)
+            return self.calculators[key]
         except KeyError:
             if key in self.centers:
                 fn = self._build_function(key)
-                self[key] = fn
-        return super(CenterCalculator, self).__getitem__(key)
+                self.calculators[key] = fn
+        return self.calculators[key]
+
+    def _get_codes(self, key, indexes):
+        return get_center_codes(key, indexes, get_code=self.get_code)
     
     def _build_function(self, key):
         key = self.normalize_key(key)
         centers = self.centers[key]
         num_centers = len(centers)
-        codes = self.get_codes(key, range(num_centers))
+        codes = self._get_codes(key, range(num_centers))
 
         # Create reusable function to calculate center point(s)
         def fn(atoms, skip_partial_residues=True):
@@ -118,14 +122,13 @@ class CenterCalculator(dict):
                     point = self.get_point(found_atoms)
                     points.append((code, point))
                 elif strict:
-                    print(strict, self.strict, fail_on_partial_residues)
                     try:
                         res = "/".join(map(str, atoms.get_full_id()))
                     except AttributeError:
                         res = atoms
                     atoms = list(atoms)
                     expected = center_atoms
-                    raise ValueError("Missing atoms in {0} ({1}): {2} /= {3}".format(code, res, atoms, expected))
+                    raise ValueError("Missing atoms in {0} ({1}): {2} != {3}".format(code, res, atoms, expected))
             return points
         return fn
 
@@ -167,7 +170,7 @@ class CenterCalculator(dict):
         return self.get_center(arg, **kwargs)
 
 
-DEFAULT_CENTERS = CenterCalculator(CENTERS, CLASSES)
+DEFAULT_CENTERS = CenterCalculator(DEFAULT_CENTER_ATOMS, DEFAULT_CLASSES)
 get_residue_center_coords = DEFAULT_CENTERS.get_center
 
 

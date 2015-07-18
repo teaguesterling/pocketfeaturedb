@@ -2,6 +2,7 @@
 from datetime import datetime
 
 from flask.ext.login import UserMixin
+
 from drake.compat import text_type
 from drake.extensions import bcrypt
 from ..binds import AccessModel

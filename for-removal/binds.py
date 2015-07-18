@@ -1,5 +1,5 @@
 from flask import current_app
-from .core import (
+from featuredb.data.core import (
     ArrowTimestamp,
     BaseModel,
     Column,

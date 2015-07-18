@@ -1,4 +1,3 @@
-import types
 from .utils import register_extension
 
 EXT_NAME = 'initbroadcast'
