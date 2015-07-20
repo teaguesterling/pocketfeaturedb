@@ -46,7 +46,6 @@ def create_app(package_name=_DEFAULT_NAME,
 
 def register_extensions(app):
     db.init_app(app)
-    initboradcaster.init_app(app)
 
 
 

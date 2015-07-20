@@ -1,18 +1,16 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
+from pocketfeature import defaults
 from pocketfeature.algorithms import filter_scores
 from pocketfeature.io import matrixvaluesfile
-from pocketfeature.io.backgrounds import (
-    ALLOWED_ALIGNMENT_METHODS as _ALLOWED_ALIGNMENT_METHODS,
-    ALLOWED_SCALE_FUNCTIONS,
-)
 from pocketfeature.io.matrixvaluesfile import MatrixValues
 from pocketfeature.tasks.core import Task
 
 
-ALLOWED_ALIGNMENT_METHODS = _ALLOWED_ALIGNMENT_METHODS.copy()
+ALLOWED_ALIGNMENT_METHODS = defaults.ALLOWED_ALIGNMENT_METHODS.copy()
 _original_munkres = ALLOWED_ALIGNMENT_METHODS.get('munkres')
+
 if callable(_original_munkres):
     def munkres_special_case(scores):
         matrix = scores.to_array(default=float('inf'))
@@ -34,11 +32,13 @@ class AlignScores(Task):
     DEFAULT_CUTOFF = -0.15
     DEFAULT_COLUMN = 1  # Normalized in 2nd column
 
+    ALIGNMENT_METHODS = ALLOWED_ALIGNMENT_METHODS
+    SCALE_METHODS = defaults.ALLOWED_SCALE_FUNCTIONS
 
     def run(self):
         params = self.params
-        align_fn = ALLOWED_ALIGNMENT_METHODS[params.method]
-        scale_fn = ALLOWED_SCALE_FUNCTIONS[params.scale_method]
+        align_fn = self.ALIGNMENT_METHODS[params.method]
+        scale_fn = self.SCALE_METHODS[params.scale_method]
         columns = [params.score_column]
         scores = matrixvaluesfile.load(params.scores, columns=columns, cast=float)
         alignment = align_scores(align_fn, scores, params.cutoff)
@@ -83,10 +83,10 @@ class AlignScores(Task):
                                                     type=int,
                                                     help='Value column index in score file to use for aligning [default: 1]')
         parser.add_argument('-m', '--method', metavar='ALIGN_METHOD',
-                                      choices=ALLOWED_ALIGNMENT_METHODS.keys(),
+                                      choices=cls.ALIGNMENT_METHODS.keys(),
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
         parser.add_argument('-S', '--scale-method', metavar='SCALE_METHOD',
-                                      choices=ALLOWED_SCALE_FUNCTIONS.keys(),
+                                      choices=cls.SCALE_METHODS.keys(),
                                       help="Method to re-scale score based on pocket sizes (one of: %(choices)s) [default: %(default)s]")
         parser.add_argument('-o', '--output', metavar='VALUES',
                                               type=FileType.compressed('w'),

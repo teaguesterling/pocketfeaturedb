@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
+from six import text_type
+
 from feature.io.pointfile import PDBPoint
 
-from pocketfeature.utils.ff import residue_code_three_to_one
-from pocketfeature.residues import DEFAULT_CENTERS
+from pocketfeature import defaults
 
 
 class Pocket(object):
@@ -15,9 +16,11 @@ class Pocket(object):
     def __init__(self, residues, pdbid=None,
                                  defined_by=None,
                                  name=None,
-                                 residue_centers=DEFAULT_CENTERS,
+                                 residue_centers=defaults.DEFAULT_RESIDUE_CENTERS,
                                  points=None,
                                  skip_partial_residues=True):
+        if isinstance(residue_centers, text_type):
+            residue_centers = defaults.NAMED_RESIDUE_CENTERS[residue_centers]
         self._pdbid = pdbid
         self._residues = residues
         self._defined_by = defined_by

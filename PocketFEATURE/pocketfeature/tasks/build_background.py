@@ -8,9 +8,10 @@ import logging
 import multiprocessing
 import os
 import random
+
 from six import string_types
 
-from feature.backends.external import generate_dssp_file 
+from feature.backends.external import generate_dssp_file
 from feature.backends.wrappers import featurize_points_raw
 from feature.io import (
     featurefile,
@@ -20,25 +21,28 @@ from feature.io.locate_files import (
     find_pdb_file,
     find_dssp_file,
 )
-
 from pocketfeature.algorithms import GaussianStats
+from pocketfeature.datastructs import (
+    MatrixValues,
+    PassThroughItems,
+    PocketFeatureBackgroundMetaData,
+    MEAN_VECTOR,
+    MIN_VECTOR,
+    MAX_VECTOR,
+    STD_DEV_VECTOR,
+    VAR_VECTOR,
+)
 from pocketfeature.io import (
-    backgrounds,
+    backgroundfile,
     featurefile as featurefile_pf,
     pdbfile,
     matrixvaluesfile,
 )
-from pocketfeature.io.backgrounds import ALLOWED_SIMILARITY_METRICS
-from pocketfeature.io.matrixvaluesfile import (
-    MatrixValues,
-    PassThroughItems,
-)
-from pocketfeature.residues import DEFAULT_CENTERS
+from pocketfeature import defaults
 from pocketfeature.tasks.core import (
     Task,
     ensure_all_imap_unordered_results_finish,
-)   
-
+)
 from pocketfeature.tasks.pocket import (
     create_pocket_around_ligand,
     find_ligand_in_structure,
@@ -76,9 +80,10 @@ def existing_file(path, mode='r', resume=False):
             yield (f, False)
 
 
-def pocket_from_pocket_def(pocket_def, if_no_ligand=pick_best_ligand,
-                                       residue_centers=DEFAULT_CENTERS,
-                                       distance_threshold=6.0):
+def pocket_from_pocket_def(pocket_def, residue_centers,
+                           if_no_ligand=pick_best_ligand,
+                           distance_threshold=6.0):
+
     pdb_data, ligand_data = pocket_def
     
     if isinstance(pdb_data, string_types):
@@ -107,8 +112,8 @@ def pocket_from_pocket_def(pocket_def, if_no_ligand=pick_best_ligand,
     return pocket
 
 
-def _pocket_from_pocket_def_star(args):
-    pocket_def, args, kwargs = args
+def _pocket_from_pocket_def_star(packed):
+    pocket_def, args, kwargs = packed
     pocket = pocket_from_pocket_def(pocket_def, *args, **kwargs) 
     if pocket is not None:
         return pocket.pickelable
@@ -224,7 +229,7 @@ def _featurize_point_stream_star(args):
 
 
 def calculate_residue_pair_normalization(key, thresholds, fileA, fileB, storeFile=None, compare_method=None):
-    compute_raw_cutoff_similarity = ALLOWED_SIMILARITY_METRICS[compare_method]
+    compute_raw_cutoff_similarity = defaults.ALLOWED_SIMILARITY_METHODS[compare_method]
     with gzip.open(fileA) as ioA, \
          gzip.open(fileB) as ioB, \
          maybe_open(storeFile, 'w', gzip.open) as ioStore:
@@ -266,29 +271,29 @@ def _calculate_residue_pair_normalization_star(args):
 
 
 def create_background_features_from_stats(stats, **metadata_fields):
-    metadata = featurefile_pf.PocketFeatureBackgroundMetaData()
+    metadata = PocketFeatureBackgroundMetaData()
     metadata.update(metadata_fields)
     comment = ["{0}".format(stats.n)]
 
     vectors = [
         metadata.create_vector(
-            name=backgrounds.MEAN_VECTOR,
+            name=MEAN_VECTOR,
             features=stats.mean,
             comments=comment),
         metadata.create_vector(
-            name=backgrounds.VAR_VECTOR,
+            name=VAR_VECTOR,
             features=stats.variance,
             comments=comment),
         metadata.create_vector(
-            name=backgrounds.STD_DEV_VECTOR,
+            name=STD_DEV_VECTOR,
             features=stats.std_dev,
             comments=comment),
         metadata.create_vector(
-            name=backgrounds.MIN_VECTOR,
+            name=MIN_VECTOR,
             features=stats.mins,
             comments=comment),
         metadata.create_vector(
-            name=backgrounds.MAX_VECTOR,
+            name=MAX_VECTOR,
             features=stats.maxes,
             comments=comment),
     ]
@@ -318,6 +323,11 @@ class GeneratePocketFeatureBackground(Task):
         log.warn("DSSP_DIR is {0}".format(params.dssp_dir))
         log.warn("FEATURE_DIR is {0}".format(params.feature_dir))
         log.warn("temporary FF_DIR is {0}".format(params.ff_dir))
+
+        self.residue_centers = defaults.DEFAULT_RESIDUE_CENTERS
+
+        if isinstance(self.residue_centers, string_types):
+            self.residue_centers = defaults.NAMED_RESIDUE_CENTERS[self.residue_centers]
 
         if os.path.exists(params.ff_dir):
             if params.resume:
@@ -351,7 +361,7 @@ class GeneratePocketFeatureBackground(Task):
         
         if params.resume and os.path.exists(params.background):
             with open(params.background) as f:
-                bg = backgrounds.load_stats_data(f)
+                bg = backgroundfile.load_stats_data(f)
         else:
             if params.resume and os.path.exists(self.point_file):
                 log.info("Found existing pointfile at {0}".format(self.point_file))
@@ -377,7 +387,8 @@ class GeneratePocketFeatureBackground(Task):
                     SHELL_WIDTH=metadata.shell_width,
                     PROPERTIES=metadata.properties,
                     PDBID_LIST=pdbs,
-                    SIMILARITY_STD_THRESHOLD=threshold)  # Threshold should be part of coeffs
+                    SIMILARITY_STD_THRESHOLD=threshold
+            )  # Threshold should be part of coeffs
                                                          # Need to add metadata to coeefs first
             log.info("Extracted {0} vectors".format(stats.n))
             log.debug("Writing Background stats to {0}".format(params.background))
@@ -390,7 +401,7 @@ class GeneratePocketFeatureBackground(Task):
         threshold = params.std_threshold
         log = self.log
 
-        std_dev = self.bg.get(backgrounds.STD_DEV_VECTOR)
+        std_dev = self.bg.get(backgroundfile.STD_DEV_VECTOR)
         thresholds = threshold * std_dev.features
 
         pairs, resumed = self.get_allowed_ff_pairs()
@@ -459,7 +470,10 @@ class GeneratePocketFeatureBackground(Task):
         num_successful = 0
         num_failed = 0
         num_processors = min(self.params.num_processors, num_pdbs)
-        kwargs = {'distance_threshold': self.params.distance}
+        kwargs = {
+            'residue_centers': self.residue_centers,
+            'distance_threshold': self.params.distance,
+        }
         all_args = [(pocket_def, (), kwargs) for pocket_def in pocket_defs]
         if self.params.num_processors is not None and num_processors > 1:
             self.log.info("Extracting pockets with with {0} workers".format(num_processors))
@@ -642,7 +656,7 @@ class GeneratePocketFeatureBackground(Task):
         return point
 
     def get_allowed_ff_pairs(self):
-        allowed_pairs = backgrounds.ALLOWED_VECTOR_TYPE_PAIRS[self.params.allowed_pairs]
+        allowed_pairs = defaults.ALLOWED_VECTOR_TYPE_PAIRS[self.params.allowed_pairs]
         if self.params.resume and os.path.exists(self.params.normalization):
             with open(self.params.normalization) as f:
                 completed = matrixvaluesfile.load(f)
@@ -654,7 +668,7 @@ class GeneratePocketFeatureBackground(Task):
         all_pairs = itertools.product(ff_types.items(), ff_types.items())
         allowed_map = {}
         for (typeA, pathA), (typeB, pathB) in all_pairs:
-            key = backgrounds.make_vector_type_key((typeA, typeB))
+            key = backgroundfile.make_vector_type_key((typeA, typeB))
             if key in allowed_pairs and key not in finished:
                 allowed_map[key] = (pathA, pathB)  # order isn't important
         return allowed_map, finished
@@ -662,7 +676,7 @@ class GeneratePocketFeatureBackground(Task):
     def get_ff_pair_scores_files(self, pairs):
         scores_map = {}
         for (typeA, typeB), (ffA, ffB) in pairs.items():
-            key = backgrounds.make_vector_type_key((typeA, typeB))
+            key = backgroundfile.make_vector_type_key((typeA, typeB))
             if self.params.all_data:
                 scores_file = "{0}-{1}.scores.gz".format(*key)
                 scores_path = os.path.join(self.params.ff_dir, scores_file)
@@ -739,8 +753,8 @@ class GeneratePocketFeatureBackground(Task):
                                               default=cls.TEMP_FF_DIR_DEFAULT,
                                               help='Directory to store temporary FEATURE files [default: %(default)s]')
         parser.add_argument('-p', '--allowed-pairs', metavar='PAIR_SET_NAME',
-                                      choices=backgrounds.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
-                                      default='classes',
+                                      choices=defaults.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
+                                      default=defaults.DEFAULT_VECTOR_TYPE_PAIRS,
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
         parser.add_argument('-t', '--std-threshold', metavar='NSTD',
                                      type=float,
@@ -758,7 +772,8 @@ class GeneratePocketFeatureBackground(Task):
                                             default=None,
                                             help='Limit the number of points to include')
         parser.add_argument('-C', '--compare-method', metavar='COMPARISON',
-                                              default='tversky22',
+                                              choices=defaults.ALLOWED_SIMILARITY_METHODS,
+                                              default=defaults.DEFAULT_SIMILARITY_METHOD,
                                               help='Comparisoin method to use [default: %(default)s]')
         parser.add_argument('-P', '--num-processors', metavar='PROCS',
                                                       default=1,

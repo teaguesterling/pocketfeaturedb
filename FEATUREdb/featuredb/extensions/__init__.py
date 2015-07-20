@@ -5,7 +5,6 @@ in app.py
 
 from __future__ import absolute_import
 
-from .initbroadcast import InitBroadcaster
 from .sqla import (
     PluggableSQLAlchemy as SQLAlchemy,
     Query,
@@ -18,4 +17,3 @@ __author__ = 'Teague Sterling'
 db = SQLAlchemy(query_cls=Query,
                 model_cls=Model,
                 session_cls=Session)
-initboradcaster = InitBroadcaster(['featuredb.data'])

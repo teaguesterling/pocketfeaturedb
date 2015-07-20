@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
+import csv
 import logging
 import os
 
@@ -9,26 +10,30 @@ from feature.io import (
 )
 from feature.io.common import open_compressed
 
+from pocketfeature.datastructs import NORMALIZED_SCORE
+
 from pocketfeature.io import (
-    backgrounds,
+    backgroundfile,
     featurefile,
     matrixvaluesfile,
     pdbfile,
-    residuefile,
 )
-from pocketfeature.io.backgrounds import NORMALIZED_SCORE
 from pocketfeature.tasks.pocket import (
     create_pocket_around_ligand,
     find_one_of_ligand_in_structure,
     focus_structure,
     pick_best_ligand,
 )
-from pocketfeature.tasks.align import AlignScores
+from pocketfeature.tasks.align import (
+    AlignScores,
+    align_scores,
+)
 from pocketfeature.tasks.compare import FeatureFileCompare
 from pocketfeature.tasks.featurize import (
     featurize_points,
     update_environ_from_namespace,
 )
+from pocketfeature.tasks.rmsd import compute_alignment_rmsd
 from pocketfeature.tasks.visualize import create_alignment_visualizations
 from pocketfeature.utils.args import LOG_LEVELS
 from pocketfeature.utils.pdb import guess_pdbid_from_stream
@@ -155,6 +160,8 @@ class ComparePockets(Task):
     COULD_NOT_FIND_POCKET = 1
 
     def run(self):
+        self.computed = {}
+
         params = self.params
         environ = dict(os.environ.items())
         update_environ_from_namespace(environ, params)
@@ -169,11 +176,11 @@ class ComparePockets(Task):
         alignment_method = AlignScores.ALIGNMENT_METHODS[params.alignment_method]
         scale_method = AlignScores.SCALE_METHODS[params.scale_method]
 
-        background = backgrounds.load(stats_file=params.background,
-                                      norms_file=params.normalization,
-                                      compare_function=comparison_method,
-                                      allowed_pairs=params.allowed_pairs,
-                                      std_threshold=params.std_threshold)
+        background = backgroundfile.load(stats_file=params.background,
+                                         norms_file=params.normalization,
+                                         compare_function=comparison_method,
+                                         allowed_pairs=params.allowed_pairs,
+                                         std_threshold=params.std_threshold)
 
         log.info("Loading PDBs")
         log.debug("Extracting PDBIDs")
@@ -232,6 +239,9 @@ class ComparePockets(Task):
             signature_stringB = get_pocket_signature(pointsB)
         except (ValueError):
             return self.COULD_NOT_FIND_POCKET
+
+        self.computed['pocketA'] = signature_stringA
+        self.computed['pocketB'] = signature_stringB
                               
         log.info("Generating FEATURE vectors")
         ffA_cache_file = None
@@ -259,10 +269,15 @@ class ComparePockets(Task):
     
         numA = len(featurefileA.vectors)
         numB = len(featurefileB.vectors)
+
+        self.computed['numA'] = numA
+        self.computed['numB'] = numB
     
         log.info("Comparing Vectors")
         scores = background.get_comparison_matrix(featurefileA, featurefileB)
         num_scores = len(scores)
+        self.computed['num_scored'] = num_scores
+
         log.info("Scored {0} vectors (out of {1}x{2}={3} total)".format(
                     num_scores,
                     numA,
@@ -275,18 +290,20 @@ class ComparePockets(Task):
         normalized = scores.slice_values(NORMALIZED_SCORE)
 
         log.info("Aligning Pockets")
-        alignment = alignment_method(normalized, cutoff=params.cutoff)
+        alignment = align_scores(alignment_method, normalized, cutoff=params.cutoff)
         num_aligned = len(alignment)
-        if len(scores) > 0:
-            num_scored_a, num_scored_b = map(len, scores.indexes)
-        else:
-            num_scored_a, num_scored_b = 0, 0
+        self.computed['num_aligned'] = num_aligned
         log.debug("Aligned {0} points".format(len(alignment)))
+
         total_score = sum(alignment.values())
+        self.computed['alignment_score'] = round(total_score, 3)
+
         scale_params = ()
         scale_sizes = (numA, numB, len(scores), num_aligned)
         scaled_score = scale_method(scale_params, scale_sizes, total_score)
-        alignment_with_raw_scores = scores.subset_from_keys(alignment.keys())
+        self.computed['scaled_score'] = round(scaled_score, 3)
+
+        #alignment_with_raw_scores = scores.subset_from_keys(alignment.keys())
         
         if params.alignment is not None:
             log.debug("Writing alignment")
@@ -295,14 +312,17 @@ class ComparePockets(Task):
             
         log.info("Alignment Score: {0}".format(total_score))
 
-        print("{0}\t{1}\t{2:d}\t{3:d}\t{4:d}\t{5:d}\t{6:0.5f}\t{7:0.05g}"\
-                    .format(signature_stringA, signature_stringB, 
-                            numA, numB, num_scores, num_aligned,
-                            total_score, scaled_score),
-              file=params.output)
+        alignment_rmsd = compute_alignment_rmsd(alignment, pointsA, pointsB)
+        self.computed['alignment_rmsd'] = round(alignment_rmsd, 3)
 
+        writer = csv.DictWriter(params.output,
+                                dialect=csv.excel_tab,
+                                fieldnames=('pocketA', 'pocketB', 'numA','numB',
+                                            'num_scored', 'num_aligned',
+                                            'alignment_score', 'scaled_score', 'alignment_rmsd'))
+        writer.writeheader()
+        writer.writerow(self.computed)
 
-        
         if params.pymolA is not None or params.pymolB is not None:
             log.info("Creating PyMol scripts")
             scriptA, scriptB = create_alignment_visualizations(pointsA,
@@ -311,12 +331,12 @@ class ComparePockets(Task):
                                                                pdbA=params.pdbA.name,
                                                                pdbB=params.pdbB.name)
 
-        if params.pymolA is not None:
-            log.debug("Writing first PyMol script") 
-            print(scriptA, file=params.pymolA)
-        if params.pymolB is not None:
-            log.debug("Writing first PyMol script") 
-            print(scriptB, file=params.pymolB)
+            if params.pymolA is not None:
+                log.debug("Writing first PyMol script")
+                print(scriptA, file=params.pymolA)
+            if params.pymolB is not None:
+                log.debug("Writing first PyMol script")
+                print(scriptB, file=params.pymolB)
 
         return 0
 
@@ -390,7 +410,6 @@ class ComparePockets(Task):
     def arguments(cls, stdin, stdout, stderr, environ, task_name):
         from argparse import ArgumentParser
         from pocketfeature.utils.args import (
-            decompress,
             FileType,
             ProteinFileType,
         )
@@ -433,7 +452,7 @@ class ComparePockets(Task):
                                       type=FileType.compressed('r'),
                                       help='Map of normalization coefficients for residue type pairs [default: %(default)s')
         parser.add_argument('-p', '--allowed-pairs', metavar='PAIR_SET_NAME',
-                                      choices=backgrounds.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
+                                      choices=FeatureFileCompare.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
         parser.add_argument('-C', '--comparison-method', metavar='COMPARISON_METHOD',
                                       choices=FeatureFileCompare.COMPARISON_METHODS.keys(),

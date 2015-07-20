@@ -6,13 +6,12 @@ from numpy.linalg import norm
 from Bio.PDB.NeighborSearch import NeighborSearch
 
 from feature.io import pointfile
-
 from pocketfeature.io import (
     pdbfile,
     residuefile,
 )
-from pocketfeature.pocket import Pocket
-from pocketfeature.residues import DEFAULT_CENTERS
+from pocketfeature.datastructs.pocket import Pocket
+from pocketfeature import defaults
 from pocketfeature.utils.pdb import (
     residue_name,
     find_residues_by_name,
@@ -21,8 +20,10 @@ from pocketfeature.utils.pdb import (
     is_het_residue,
     list_ligands,
 )
-
-from pocketfeature.tasks.core import Task
+from pocketfeature.tasks.core import (
+    Task,
+    TaskFailure,
+)
 
 
 def focus_structure(structure, model=0, chain=None):
@@ -93,10 +94,12 @@ def find_neighboring_residues_and_points(structure, queries, cutoff=6.0,
 
 def create_pocket_around_ligand(structure, ligand, cutoff=6.0, 
                                                    name=None,
-                                                   residue_centers=DEFAULT_CENTERS, 
+                                                   residue_centers=defaults.DEFAULT_RESIDUE_CENTERS,
                                                    exact_points=True,
                                                    expand_disordered=True,
                                                    **options):
+    if isinstance(residue_centers, string_types):
+        residue_centers = defaults.NAMED_RESIDUE_CENTERS[residue_centers]
     atoms = list(ligand)
     if expand_disordered:
         atoms = [atom_pos for atom in atoms 
@@ -159,11 +162,11 @@ def pick_best_ligand(structure):
 class PocketFinder(Task):
     LIGAND_RESIDUE_DISTANCE = 6.0
 
-    def run(self):
-        params = self.params
+    def setup_inputs(self, params):
         if params.pdbid is None:
-            params.pdbid, pdb = guess_pdbid_from_stream(params.pdb)
+            pdbid, pdb = guess_pdbid_from_stream(params.pdb)
         else:
+            pdbid = params.pdbid
             pdb = params.pdb
 
         if params.model == -1:
@@ -175,40 +178,75 @@ class PocketFinder(Task):
         else:
             chain_id = params.chain
 
-        structure = pdbfile.load(pdb, pdbid=params.pdbid)
-        structure = focus_structure(structure, model=model_id, chain=chain_id)
+        self.model_id = model_id
+        self.chain_id = chain_id
+        self.pdbid = pdbid
+        self.pdb = pdb
 
-        ligand = params.ligand
-        if params.list_only:
-            ligands = list_ligands(structure)
-            residuefile.dump(ligands, params.output)
-            return 0
-        
-        if not ligand:
-            ligand = pick_best_ligand(structure)
-        elif len(ligand) == 1:
-            ligand = find_ligand_in_structure(structure, ligand[0])
+        self.ligand = params.ligand
+
+    def setup_params(self, params):
+        self.distance = params.distance
+        self.ignore_disordered = params.ignore_disordered
+
+    def setup_output_options(self, params):
+        self.list_only = params.list_only
+        self.print_residues = params.print_residues
+        self.print_pointfile = params.print_pointfile
+
+    def setup_outputs(self, params):
+        self.output = params.output
+
+    def run_find_structure(self):
+        structure = pdbfile.load(self.pdb, pdbid=self.pdbid)
+        structure = focus_structure(structure, model=self.model_id, chain=self.chain_id)
+        self.structure = structure
+
+    def run_find_ligand(self):
+        if not self.ligand:
+            self.ligand = pick_best_ligand(self.structure)
+        elif len(self.ligand) == 1:
+            self.ligand = find_ligand_in_structure(self.structure, self.ligand[0])
         else:
-            ligand = find_one_of_ligand_in_structure(structure, ligand)
-        
-        if ligand is None:
-            print("Error: Could not find ligand in structure", file=params.log)
-            return -1
+            self.ligand = find_one_of_ligand_in_structure(self.structure, self.ligand)
 
-        pocket = create_pocket_around_ligand(structure, ligand, cutoff=params.distance,
-                                                                expand_disordered=not params.ignore_disordered)
+        if self.ligand is None:
+            raise TaskFailure("Could not find ligand in structure")
+
+    def run_create_pocket(self):
+        pocket = create_pocket_around_ligand(self.structure, self.ligand,
+                                             cutoff=self.distance,
+                                             expand_disordered=not self.ignore_disordered)
+        self.pocket = pocket
 
         if len(pocket.residues) == 0:
-            print("Error: No residues found within {0} angstroms of {1}".format(params.distance, ligand),
-                    file=params.log)
-            return -1
+            raise TaskFailure("No residues found within {0} angstroms of {1}".format(self.distance, self.ligand))
 
-        if params.print_residues:
-            residuefile.dump(pocket.residues, params.output)
-        elif params.print_pointfile:
-            pointfile.dump(pocket.points, params.output)
+    def produce_result(self):
+        if self.return_only:
+            return self.pocket
+        elif self.print_residues:
+            return self.finish_with_output(residuefile.dump, self.pocket.residues, self.output)
+        else:
+            return self.finish_with_output(pointfile.dump, self.pocket.points, self.output)
 
-        return 0
+    def setup(self):
+        self.setup_inputs(self.params)
+        self.setup_params(self.params)
+        self.setup_output_options(self.params)
+        self.setup_outputs(self.params)
+
+    def run(self):
+        self.run_find_structure()
+
+        if self.list_only:
+            ligands = list_ligands(self.structure)
+            return self.finish_with_output(residuefile.dump, ligands, self.output)
+        
+        self.run_find_ligand()
+        self.run_create_pocket()
+
+        return self.produce_result()
 
     @classmethod
     def defaults(cls, stdin, stdout, stderr, environ):

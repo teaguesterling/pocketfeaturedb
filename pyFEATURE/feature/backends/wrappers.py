@@ -11,6 +11,15 @@ from feature.backends import external
 from feature.backends.external import default_environ
 
 
+__all__ = [
+    'standard_config',
+    'legacy_config',
+    'current_config',
+    'featurize_points_raw',
+    'featurize_points',
+    'featurize_pdb'
+]
+
 WORKING_FEATURIZE_METHOD = None
 
 FEATURIZE_METHODS = [
@@ -30,8 +39,13 @@ def legacy_config():
     global WORKING_FEATURIZE_METHOD
     WORKING_FEATURIZE_METHOD = external.featurize_points_tempfile
 
+def current_config():
+    global WORKING_FEATURIZE_METHOD
+    return WORKING_FEATURIZE_METHOD
+
 
 def determine_correct_featurize_method(points, _iter=True, **kwargs):
+    global WORKING_FEATURIZE_METHOD
     warnings.warn("Attempting to determine FEATURE pointfile calling method")
     errors = []
     error_indications = ('WARNING: ', 'ERROR: ', 'Usage: ')
@@ -51,6 +65,7 @@ def determine_correct_featurize_method(points, _iter=True, **kwargs):
 
 
 def _try_to_featurize_points(points, _iter=True, **kwargs):
+    global WORKING_FEATURIZE_METHOD
     if WORKING_FEATURIZE_METHOD is None:
         return determine_correct_featurize_method(points, **kwargs)
     else:

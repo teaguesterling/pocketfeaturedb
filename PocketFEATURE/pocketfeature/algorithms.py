@@ -377,6 +377,20 @@ def munkres_align(scores, shift_negative=False, maximize=False):
     return indexes
 
 
+def alignment_rmsd(alignment, pointsA, pointsB):
+    ds = np.zeros(len(alignment))
+
+    for idx, (key, score) in enumerate(alignment):
+        keyA, keyB = key
+        coordsA = pointsA[keyA]
+        coordsB = pointsB[keyB]
+        ds[idx] = np.linalg.norm(coordsA - coordsB)
+
+    rmsd = np.sqrt(np.mean(ds ** 2))
+
+    return rmsd
+
+
 class GaussianStats(object):
     """ A class for calculating simple statistics over streams of data """
 

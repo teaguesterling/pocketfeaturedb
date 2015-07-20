@@ -1,5 +1,5 @@
 #!/usr/bin/env pythoe
-from __future__ import print_function
+from __future__ import absolute_import, print_function
 
 import itertools
 import logging
@@ -17,13 +17,14 @@ from feature.io.common import open_compressed
 from pocketfeature.algorithms import GaussianStats
 from pocketfeature.io import (
     matrixvaluesfile,
-    backgrounds,
+    backgroundfile,
 )
-from pocketfeature.io.matrixvaluesfile import PassThroughItems
+from pocketfeature.datastructs.matrixvalues import PassThroughItems
 from pocketfeature.tasks.core import (
     Task,
     ensure_all_imap_unordered_results_finish,
 )
+from pocketfeature import defaults
 from pocketfeature.tasks.align import AlignScores
 from pocketfeature.tasks.compare import FeatureFileCompare
 from pocketfeature.tasks.build_background import get_pdb_list
@@ -409,7 +410,7 @@ class BenchmarkPocketFeatureBackground(Task):
                                                  default=cls.TEMP_BENCH_DIR_DEFAULT,
                                                  help='Directory to store benchmark files [default: %(default)s]')
         parser.add_argument('-p', '--allowed-pairs', metavar='PAIR_SET_NAME',
-                                      choices=backgrounds.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
+                                      choices=defaults.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
                                       default='classes',
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
         parser.add_argument('-t', '--std-threshold', metavar='NSTD',

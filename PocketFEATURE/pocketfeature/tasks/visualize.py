@@ -8,7 +8,6 @@ import random
 
 from feature.io import pointfile
 from pocketfeature.io import matrixvaluesfile
-from pocketfeature.io import residuefile
 
 from pocketfeature.tasks.core import Task
 
@@ -225,7 +224,7 @@ class VisAlign(Task):
                                         nargs='?',
                                         default=None)
         radius_group = parser.add_mutually_exclusive_group()
-        radois_group.add_argument('--radius', metavar='BASE_RADIUS',
+        radius_group.add_argument('--radius', metavar='BASE_RADIUS',
                                               help='Base radius to scale score by',
                                               type=float,
                                               nargs='?',

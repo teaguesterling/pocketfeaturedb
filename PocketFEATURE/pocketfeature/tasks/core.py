@@ -6,6 +6,12 @@ import sys
 import time
 
 
+class TaskFailure(RuntimeError):
+    def __init__(self, *args, **kwargs):
+        self.code = kwargs.get('code', -1)
+        super(TaskFailure, self).__init__(*args, **kwargs)
+
+
 class Namespace(object):
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -38,6 +44,7 @@ def ensure_all_imap_unordered_results_finish(result, expected=None, wait=0.5):
 
 
 class Task(object):
+    DEBUG = bool(os.environ.get('DEBUG', True))
 
     def __init__(self, params=None, **kwargs):
         if params is None and kwargs:
@@ -45,13 +52,43 @@ class Task(object):
         self.params = params
         self.output = getattr(params, 'output', sys.stdout)
         self.log = getattr(params, 'log', sys.stderr)
+        self.return_only = False
 
     @classmethod
     def task_name(cls):
         return cls.__name__
 
+    def apply_setup(self, params, overrides, defaults, mappings):
+        for self_key, param_key in mappings.items():
+            if param_key in overrides:
+                value = overrides[param_key]
+            elif hasattr(param_key, params):
+                value = getattr(params, param_key)
+            elif param_key in defaults:
+                value = defaults[param_key]
+            else:
+                raise AttributeError("Could not find {} in params (or overrides, or defaults)".format(param_key))
+            setattr(self, self_key, value)
+
+    def setup(self):
+        pass
+
     def run(self):
         return 0
+
+    def produce_output(self):
+        return 0
+
+    def finish_with_output(self, writer, data, destination, exitcode=0):
+        if destination is None:
+            return data
+        else:
+            writer(data, destination)
+            return exitcode
+
+    def failed(self, message, code=-1):
+        self.log(message)
+        raise TaskFailure(message, code=code)
 
     @classmethod
     def from_namespace(cls, params):
@@ -76,10 +113,14 @@ class Task(object):
         return {}
 
     @classmethod
-    def arguments(cls, stdin, stdout, stderr, environ, task_name):
+    def parser(cls, stdin, stdout, stderr, environ, task_name):
         from argparse import ArgumentParser
         parser = ArgumentParser(task_name)
-        return params
+        return parser
+
+    @classmethod
+    def arguments(cls, stdin, stdout, stderr, environ, task_name, parser=None):
+        return parser
 
     @classmethod
     def main(cls, args, stdin, stdout, stderr, environ=None, _sys_args=False):
@@ -100,23 +141,32 @@ class Task(object):
           conf['task_name'] = args[0]
           args = args[1:]
         else:
-          conf['task_name'] = self.task_name()
+          conf['task_name'] = cls.task_name()
 
+        parser = cls.parser(**conf)
         parser = cls.arguments(**conf)
         params = parser.parse_args(args)
         task = cls.from_namespace(params)
+        task.setup()
         return task.run()
 
     @classmethod
     def run_as_script(cls):
         try:
-            return cls.main(args=sys.argv,
-                            stdin=sys.stdin,
-                            stdout=sys.stdout,
-                            stderr=sys.stderr,
-                            environ=os.environ,
-                            _sys_args=True)
+            code =  cls.main(args=sys.argv,
+                             stdin=sys.stdin,
+                             stdout=sys.stdout,
+                             stderr=sys.stderr,
+                             environ=os.environ,
+                             _sys_args=True)
+        except TaskFailure as e:
+            code = e.code
+            if cls.DEBUG:
+                raise
         except Exception as e:
+            code = -1
             print("Error: {0}".format(e), file=sys.stderr)
-            raise
-            return -1
+            if cls.DEBUG:
+                raise
+
+        return code

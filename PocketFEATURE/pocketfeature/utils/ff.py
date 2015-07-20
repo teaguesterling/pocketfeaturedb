@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 
 from six import string_types
-from pocketfeature.io.featurefile import (
-    DESCRIPTION,
-    RESIDUE_TYPE,
-)
+from feature.io.featurefile import DESCRIPTION
+from pocketfeature.datastructs.metadata import RESIDUE_TYPE
 from pocketfeature.utils.pdb import (
     residue_code_one_to_three,
     residue_code_three_to_one,
@@ -39,15 +37,28 @@ def get_point_signature(point, signature_idx=0):
     return signature
 
 
-def get_pocket_signature(pocket, signature_idx=0, signature_parts=4, delimiter='_'):
-    if len(pocket) < 1:
+def get_pocket_signature(points, signature_idx=0, signature_parts=4, delimiter='_'):
+    if len(points) < 1:
         raise ValueError("No signature for empty pocket")
-    point = pocket[0]
+    point = points[0]
     point_signature = get_point_signature(point, signature_idx=signature_idx)
     parts = point_signature.strip(delimiter).split(delimiter)
     signature = delimiter.join(parts[:signature_parts])
     return signature
 
+
+def get_point_name_lookup(points, signature_idx=0):
+    lookup = {}
+    for point in points:
+        name = get_point_signature(point, signature_idx=0)
+        lookup[name] = point
+    return lookup
+
+
+def get_point_name_to_coords_lookup(points, signature_idx=0):
+    lookup = get_point_name_lookup(points, signature_idx=signature_idx)
+    to_coords = {key: point.coords for key, point in lookup.items()}
+    return to_coords
 
 
 def vectors_descriptions_in_file(feature_file, comment_field=DESCRIPTION):

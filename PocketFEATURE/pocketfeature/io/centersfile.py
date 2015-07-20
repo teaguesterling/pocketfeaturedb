@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from six import StringIO
 
-from ..residues import CenterCalculator
+from pocketfeature.datastructs.residues import CenterCalculator
 
 
 def loadi(it,

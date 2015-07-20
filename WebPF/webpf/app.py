@@ -1,22 +1,25 @@
 # -*- coding: utf-8 -*-
 '''The app module, containing the app factory function.'''
 
+from __future__ import absolute_import
+
 from flask import Flask, render_template
 
-from featuredb import settings
-from featuredb.assets import assets
 from featuredb.compat import string_types
-from featuredb.extensions import (
-    admin,
-    bcrypt,
+from featuredb.app import register_extensions as register_featuredb_extensions
+
+
+from webpf import settings
+
+from webpf.extensions import (
     cache,
-    celery,
-    db,
-    debug_toolbar,
-    initboradcaster,
+    bcrypt,
     login_manager,
+    admin,
+    celery,
 )
-from featuredb import views
+from webpf.assets import assets
+from webpf import views
 
 _DEFAULT_NAME = __name__
 
@@ -47,16 +50,13 @@ def create_app(package_name=_DEFAULT_NAME,
 
 
 def register_extensions(app):
-    debug_toolbar.init_app(app)
     assets.init_app(app)
     cache.init_app(app)
     bcrypt.init_app(app)
     login_manager.init_app(app)
-    admin.init_app(app)
-    db.init_app(app)
     celery.init_app(app)
-    # This should always be last
-    initboradcaster.init_app(app)
+    register_featuredb_extensions(app)
+    admin.init_app(app)
 
 
 def register_blueprints(app):

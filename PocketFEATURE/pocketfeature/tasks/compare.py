@@ -4,12 +4,13 @@ from __future__ import print_function
 import os
 
 from pocketfeature.io import (
-    backgrounds,
+    backgroundfile,
     featurefile,
     matrixvaluesfile,
 )
-from pocketfeature.io.backgrounds import ALLOWED_SIMILARITY_METRICS
-from pocketfeature.io.matrixvaluesfile import PassThroughItems
+from pocketfeature.datastructs import PassThroughItems
+
+from pocketfeature import defaults
 
 from pocketfeature.tasks.core import Task
 
@@ -18,14 +19,15 @@ class FeatureFileCompare(Task):
     BACKGROUND_FF_DEFAULT = 'background.ff'
     BACKGROUND_COEFF_DEFAULT = 'background.coeffs'
 
-    COMPARISON_METHODS = ALLOWED_SIMILARITY_METRICS.copy()
+    COMPARISON_METHODS = defaults.ALLOWED_SIMILARITY_METHODS
+    ALLOWED_VECTOR_TYPE_PAIRS = defaults.ALLOWED_VECTOR_TYPE_PAIRS
 
     def run(self):
         params = self.params
-        background = backgrounds.load(stats_file=params.background, 
-                                      norms_file=params.normalization,
-                                      allowed_pairs=params.allowed_pairs,
-                                      compare_function=self.COMPARISON_METHODS[params.method])
+        background = backgroundfile.load(stats_file=params.background,
+                                         norms_file=params.normalization,
+                                         allowed_pairs=params.allowed_pairs,
+                                         compare_function=params.method)
         features1 = featurefile.load(params.features1)
         features2 = featurefile.load(params.features2)
         # Compute scores and store directly (no matrix representation)
@@ -74,7 +76,7 @@ class FeatureFileCompare(Task):
                                       default='tversky22',
                                       help='Scoring mehtod to use (one of %(choices)s) [default: %(default)s]')
         parser.add_argument('-p', '--allowed-pairs', metavar='PAIR_SET_NAME',
-                                      choices=backgrounds.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
+                                      choices=defaults.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
                                       default='classes',
                                       help='Pair selection method to use (one of: %(choices)s) [default: %(default)s]')
         parser.add_argument('-o', '--output', metavar='VALUES',
