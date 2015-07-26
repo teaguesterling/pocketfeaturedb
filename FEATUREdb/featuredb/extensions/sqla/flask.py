@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import sqlalchemy
 import sqlalchemy.orm
 
@@ -32,9 +34,10 @@ def _set_default_query_class_to(d, query_cls=BaseQuery):
         d['query_class'] = query_cls
 
 
-def _wrap_with_query_class(fn):
+def _wrap_with_query_class(fn, query_cls):
+
     @functools.wraps(fn)
-    def newfn(*args, **kwargs):
+    def wrapper(*args, **kwargs):
         _set_default_query_class_to(kwargs)
         if "backref" in kwargs:
             backref = kwargs['backref']
@@ -43,7 +46,7 @@ def _wrap_with_query_class(fn):
             _set_default_query_class_to(backref[1])
         return fn(*args, **kwargs)
 
-    return newfn
+    return wrapper
 
 
 def _reinclude_sqlalchemy(obj, force_overwrite=_WRAPPED_SQLALCHEMY_FUNCS):
@@ -51,7 +54,7 @@ def _reinclude_sqlalchemy(obj, force_overwrite=_WRAPPED_SQLALCHEMY_FUNCS):
 
     # Rewrite if changed by original Flask-SQLAlchemy
     for module in sqlalchemy, sqlalchemy.orm:
-        for key in module.__all__:
+        for key in getattr(module, '__all__', ()):
             if not hasattr(obj, key) or key in force_overwrite:
                 setattr(obj, key, getattr(module, key))
 

@@ -26,7 +26,7 @@ from pocketfeature.tasks.core import (
 )
 from pocketfeature import defaults
 from pocketfeature.tasks.align import AlignScores
-from pocketfeature.tasks.compare import FeatureFileCompare
+from pocketfeature.tasks.compare import Compare
 from pocketfeature.tasks.build_background import get_pdb_list
 from pocketfeature.tasks.full_comparison import ComparePockets
 from pocketfeature.utils.args import LOG_LEVELS
@@ -478,4 +478,4 @@ class BenchmarkPocketFeatureBackground(Task):
 
 if __name__ == '__main__':
     import sys
-    sys.exit(FeatureFileCompare.run_as_script())
+    sys.exit(Compare.run_as_script())

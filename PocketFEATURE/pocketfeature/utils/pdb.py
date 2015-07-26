@@ -15,12 +15,12 @@ residue_code_one_to_three = one_to_three
 residue_code_three_to_one = three_to_one
 
 MIN_ATOMS_IN_LIGAND = 2
-IGNORED_LIGANDS = set((
+IGNORED_LIGANDS = set([
     'W',
     'H_SO4',
     'H_PO4',
     # Add more
-))
+])
 
 
 # From: https://stackoverflow.com/a/6658949

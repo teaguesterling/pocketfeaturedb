@@ -168,7 +168,13 @@ run_pf data/1qhx.pdb data/1qrd.pdb \
        --pdb-dir=data \
        --dssp-dir=data 
 
-run_pf data/1qhx.pdb data/1kmi.pdb \
+run_pf data/1qhx.pdb data/1alu.pdb \
+       -b data/background.ff \
+       -n data/background.coeffs \
+       --pdb-dir=data \
+       --dssp-dir=data
+
+run_pf data/1qrd.pdb data/1alu.pdb \
        -b data/background.ff \
        -n data/background.coeffs \
        --pdb-dir=data \

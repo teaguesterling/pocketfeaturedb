@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 import sys, os
 
-version = '0.3'
+version = '0.4'
 PF_TASKS = 'pocketfeature.tasks'
 
 def pf_task_script(task, script):
@@ -18,12 +18,6 @@ setup(name='PocketFEATURE',
       include_package_data=True,
       zip_safe=True,
       install_requires=[
-          # Version #s don't play nice on OS X?
-          #'numpy>=1.6.2',
-          #'scipy>=0.7.0',
-          #'biopython>=1.58',
-          #'munkres>=1.0.6',
-          #'six>=1.9.0',
           'argparse',
           'numpy',
           'scipy',
@@ -33,10 +27,9 @@ setup(name='PocketFEATURE',
       ],
       entry_points={
         'console_scripts': [
-            pf_task_script('pocket:PocketFinder', 'pf_extract'),
+            pf_task_script('extract:PocketExtractor', 'pf-extract'),
             pf_task_script('compare:FeatureFileCompare', 'pf_compare'),
             pf_task_script('align:AlignScores', 'pf_align'),
-            pf_task_script('featurize:Featurize', 'pf_featurize'),
             pf_task_script('visualize:VisAlign', 'pf_vis'),
             pf_task_script('full_comparison:ComparePockets', 'run_pf'),
             pf_task_script('build_background:GeneratePocketFeatureBackground', 'pf_genbg'),

@@ -43,7 +43,7 @@ from pocketfeature.tasks.core import (
     Task,
     ensure_all_imap_unordered_results_finish,
 )
-from pocketfeature.tasks.pocket import (
+from pocketfeature.tasks.extract import (
     create_pocket_around_ligand,
     find_ligand_in_structure,
     focus_structure,

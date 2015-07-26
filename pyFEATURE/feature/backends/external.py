@@ -9,16 +9,15 @@
     work flow. Future versions of this script will depend on a unified set
     of data structures for passing/returning results.
 """
+from __future__ import print_function
 import gzip
 import os
 import sys
 
 import sh
 
-from six import (
-    iteritems,
-    StringIO,
-)
+from six import iteritems
+from six import moves
 
 try:
     import tempfile
@@ -158,6 +157,7 @@ def featurize(pdbid=None,
               feature_dir=None,
               pdb_dir=None,
               dssp_dir=None,
+              verbose=False,
               *exec_args,
               **exec_params):
     """ A base function for running featurize
@@ -206,11 +206,13 @@ def featurize(pdbid=None,
         exec_params['s'] = search_in
     if working_dir is not None:
         exec_params['_cwd'] = working_dir
+    if verbose:
+        exec_params['v'] = True
 
     likely_problems = any(var not in environ for var in ('PDB_DIR', 'DSSP_DIR', 'FEATURE_DIR'))
 
     if with_errors:
-        errors = StringIO()
+        errors = moves.StringIO()
         exec_params['_err'] = errors
         exec_params['_ok_code'] = range(255)  # Allow all errors
         results = raw_featurize(*exec_args, **exec_params)
@@ -218,21 +220,26 @@ def featurize(pdbid=None,
         errors.close()
         return results, errors_log
     elif likely_problems:
-        errors = StringIO()
+        errors = moves.StringIO()
         exec_params['_err'] = errors
         exec_params['_ok_code'] = range(255)  # Allow all errors
-        try:
-            results = raw_featurize(*exec_args, **exec_params)
-            ok = results.exit_code
-        except sh.ErrorReturnCode:
+        results = raw_featurize(*exec_args, **exec_params)
+        ok = results.exit_code
+        if ok == 0:
+            return results
+        else:
             errors_log = errors.getvalue()
             raise RuntimeError(errors_log)
-        else:
-            return results
     else:
-        if '_err' not in exec_params:
-            exec_params['_err'] = os.devnull
-        results = raw_featurize(*exec_args, **exec_params)
+        if not exec_params.get('_err'):
+            exec_params['_err'] = moves.StringIO()
+        if verbose:
+            err = exec_params.get('_err', sys.stderr)
+            print(raw_featurize.bake(*exec_args, **exec_params), file=err)
+        try:
+            results = raw_featurize(*exec_args, **exec_params)
+        except sh.ErrorReturnCode as e:
+            raise RuntimeError("featurize reported a falure (see above)")
         return results
 
 

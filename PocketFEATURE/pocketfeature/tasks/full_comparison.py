@@ -18,7 +18,7 @@ from pocketfeature.io import (
     matrixvaluesfile,
     pdbfile,
 )
-from pocketfeature.tasks.pocket import (
+from pocketfeature.tasks.extract import (
     create_pocket_around_ligand,
     find_one_of_ligand_in_structure,
     focus_structure,
@@ -28,7 +28,7 @@ from pocketfeature.tasks.align import (
     AlignScores,
     align_scores,
 )
-from pocketfeature.tasks.compare import FeatureFileCompare
+from pocketfeature.tasks.compare import Compare
 from pocketfeature.tasks.featurize import (
     featurize_points,
     update_environ_from_namespace,
@@ -172,7 +172,7 @@ class ComparePockets(Task):
 
         log.info("Loading background")
         log.debug("Allowed residue pairs: {0}".format(params.allowed_pairs)) 
-        comparison_method = FeatureFileCompare.COMPARISON_METHODS[params.comparison_method]
+        comparison_method = Compare.COMPARISON_METHODS[params.comparison_method]
         alignment_method = AlignScores.ALIGNMENT_METHODS[params.alignment_method]
         scale_method = AlignScores.SCALE_METHODS[params.scale_method]
 
@@ -452,10 +452,10 @@ class ComparePockets(Task):
                                       type=FileType.compressed('r'),
                                       help='Map of normalization coefficients for residue type pairs [default: %(default)s')
         parser.add_argument('-p', '--allowed-pairs', metavar='PAIR_SET_NAME',
-                                      choices=FeatureFileCompare.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
+                                      choices=Compare.ALLOWED_VECTOR_TYPE_PAIRS.keys(),
                                       help='Alignment method to use (one of: %(choices)s) [default: %(default)s]')
         parser.add_argument('-C', '--comparison-method', metavar='COMPARISON_METHOD',
-                                      choices=FeatureFileCompare.COMPARISON_METHODS.keys(),
+                                      choices=Compare.COMPARISON_METHODS.keys(),
                                       help='Scoring mehtod to use (one of %(choices)s) [default: %(default)s]')
         parser.add_argument('-A', '--alignment-method', metavar='ALIGN_METHOD',
                                       choices=AlignScores.ALIGNMENT_METHODS,

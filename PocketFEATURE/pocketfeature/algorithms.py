@@ -13,6 +13,7 @@ import os
 from six import string_types
 
 import numpy as np
+from scipy.spatial import distance
 from scipy import stats
 from munkres import Munkres
 
@@ -378,15 +379,27 @@ def munkres_align(scores, shift_negative=False, maximize=False):
 
 
 def alignment_rmsd(alignment, pointsA, pointsB):
-    ds = np.zeros(len(alignment))
+    num_aligned = len(alignment)
+    if num_aligned < 2:
+        return 0
+
+    coordsA = np.empty((num_aligned, 3))
+    coordsB = np.empty((num_aligned, 3))
 
     for idx, (key, score) in enumerate(alignment):
         keyA, keyB = key
-        coordsA = pointsA[keyA]
-        coordsB = pointsB[keyB]
-        ds[idx] = np.linalg.norm(coordsA - coordsB)
+        coordsA[idx] = pointsA[keyA]
+        coordsB[idx] = pointsB[keyB]
 
-    rmsd = np.sqrt(np.mean(ds ** 2))
+    distA = distance.pdist(coordsA, distance.euclidean)
+    distB = distance.pdist(coordsB, distance.euclidean)
+
+    delta = distA - distB
+
+    numerator = np.sum(delta ** 2)
+    denominator = (num_aligned * (num_aligned - 1)) / 2
+
+    rmsd = np.sqrt(numerator / denominator)
 
     return rmsd
 

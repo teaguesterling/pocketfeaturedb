@@ -40,7 +40,7 @@ def _reinclude_sqlalchemy(obj, force_overwrite=_WRAPPED_SQLALCHEMY_FUNCS):
 
     # Rewrite if changed by original Flask-SQLAlchemy
     for module in sqlalchemy, sqlalchemy.orm:
-        for key in module.__all__:
+        for key in getattr(module, '__all__', ()):
             if not hasattr(obj, key) or key in force_overwrite:
                 setattr(obj, key, getattr(module, key))
 

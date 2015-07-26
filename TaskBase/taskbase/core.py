@@ -1,65 +1,21 @@
-from __future__ import print_function
+from __future__ import absolute_import, print_function
 
 import copy
 import logging
 import os
-import struct
 import sys
-import time
 
-from pocketfeature.utils.args import (
-    FileType,
+from .argtypes import FileType
+from .utils import (
+    LOG_LEVELS,
+    Namespace,
     setdefaults,
+    TaskFailure,
 )
 
 
-class TaskFailure(RuntimeError):
-    def __init__(self, *args, **kwargs):
-        self.reason = kwargs.get('reason', None)
-        self.code = kwargs.get('code', Task.STATUS_GENERAL_FAILURE)
-        super(TaskFailure, self).__init__(*args, **kwargs)
-
-
-class Namespace(object):
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-    def __repr__(self):
-        vals = ', '.join("{0}={1}".format(k, repr(v)) for k, v in self.__dict__.items())
-        return "{0}({1})".format(type(self), vals)
-
-
-# TODO: Move to util module
-def ensure_all_imap_unordered_results_finish(result, expected=None, wait=0.5):
-    just_started = True
-    while True:
-        try:
-            yield next(result)
-            just_started = False
-        except StopIteration:
-            if (hasattr(result, '_length') and result._length is None) \
-              or (expected is not None and result._index < expected):
-                time.sleep(wait)
-            else:
-                raise
-        except IndexError:
-            if not just_started:
-                raise
-        except struct.error:
-            if not just_started:
-                raise
-
-
 class Task(object):
-    STATUS_NOT_STARTED = -1
-    STATUS_OK = 0
-    STATUS_GENERAL_FAILURE= 1
-    STATUS_SETUP_FAILURE = 2
-    STATUS_INPUT_FAILURE = 3
-    STATUS_EMPTY_DATA = 4
-
-    LOG_LEVELS = dict((k, v) for k, v in logging._levelNames if isinstance(k, str) and v > 0)
+    LOG_LEVELS = LOG_LEVELS
 
     def __init__(self, params=None, conf=None, **kwargs):
         if params is None and kwargs:
@@ -67,14 +23,20 @@ class Task(object):
         self.params = params
         self.conf = self.fill_conf(conf)
 
+        self._current_task_name = conf.get('task_name', None)
+
         self.logger = logging
         self.log = None
-        self.debug = False
+        self.debug = True
 
         self.output = None
 
         self.task_result = None
-        self.task_status = self.STATUS_NOT_STARTED
+        self.task_status = TaskFailure.STATUS_NOT_STARTED
+
+    @property
+    def current_task_name(self):
+        return self._current_task_name or self.task_name()
 
     @classmethod
     def task_name(cls):
@@ -83,23 +45,28 @@ class Task(object):
     def setup(self):
         pass
 
+    def load_inputs(self):
+        pass
+
     def execute(self):
         pass
 
-    def produce_result(self):
+    def produce_results(self):
         pass
 
-    def setup_task(self, params, defaults, **kwargs):
-        setdefaults(defaults, self.defaults(**self.conf))
+    def setup_task(self, params, defaults=None, **kwargs):
+        defaults = defaults or Task.defaults(**self.conf)
         self.apply_setup(params, kwargs, defaults, (
             'output',
             'log',
-            'log_level'
-            'debug'
+            'log_level',
+            'debug',
         ))
-        self.logger = logging.getLogger(self.task_name())
-        self.logger.setLevel(params.log_level)
-        self.logger.addHandler(logging.StreamHandler(self.log))
+        self.logger = logging.getLogger(self.current_task_name)
+        self.logger.setLevel(params.log_level.upper())
+        if self.log != sys.stderr:
+            self.logger.addHandler(logging.StreamHandler(self.log))
+            self.logger.propagate = False
 
     def apply_setup(self, params, overrides, defaults, mappings):
         if hasattr(mappings, 'items'):
@@ -110,61 +77,74 @@ class Task(object):
         for self_key, param_key in pairs:
             if overrides and param_key in overrides:
                 value = overrides[param_key]
-            elif params and hasattr(param_key, params):
+            elif params and hasattr(params, param_key):
                 value = getattr(params, param_key)
             elif defaults and param_key in defaults:
                 value = defaults[param_key]
             else:
                 raise self.failed("Could not find {} in params (or overrides, or defaults)".format(param_key),
-                                  code=self.STATUS_SETUP_FAILURE)
+                                  code=TaskFailure.STATUS_SETUP_FAILURE)
+            self.logger.debug("Setting Parameter: {} to {!r}".format(self_key, value))
             setattr(self, self_key, value)
 
-    def generate_output(self, writer, data, destination, exitcode=None):
+    def generate_output(self, writer, data, destination, message=None, level='info'):
         if destination is not None:
+            if message is not None:
+                name = getattr(data, 'name', '<stream>')
+                notify = getattr(self.logger, level)
+                notify(message.format(name))
             writer(data, destination)
         return data
 
     def failed(self, message, reason=None, code=1):
         self.logger.error(message)
-        return TaskFailure(message, code=code, reason=None)
+        return TaskFailure(message, code=code, reason=reason)
 
     def run(self):
         try:
+            self.logger.debug("Setting up parameters")
             self.setup()
+            self.logger.debug("Loading inputs")
+            self.load_inputs()
+            self.logger.debug("Executing task")
             self.execute()
-            r = self.produce_result()
+            self.logger.debug("Generating output")
+            r = self.produce_results()
             self.task_result = r
         except TaskFailure as e:
             self.task_status = e.code
-            raise
+            self.logger.critical("Failure Occurred {!s}".format(e))
+            if self.debug:
+                raise
         except Exception as e:
-            self.task_status = self.STATUS_GENERAL_FAILURE
-            raise
+            self.task_status = TaskFailure.STATUS_GENERAL_FAILURE
+            self.logger.critical("Error Occurred {!s}".format(e))
+            if self.debug:
+                raise
         else:
-            self.task_status = self.STATUS_OK
+            self.task_status = TaskFailure.STATUS_OK
         return self.task_result
 
     @classmethod
-    def task_arguments(cls, stdin, stdout, stderr, environ, task_name, parser=None):
+    def task_arguments(cls, parser, stdin, stdout, stderr, environ, **kwargs):
         parser.add_argument('-o', '--output',
                             metavar='OUTPUT',
                             nargs='?',
                             type=FileType.compressed('w'),
-                            help='Path to output file [default: STDOUT]')
+                            help='Path to output file [default: <STDOUT>]')
         parser.add_argument('--log',
                             nargs='?',
                             metavar='LOG',
                             type=FileType,
-                            help='Path to log errors [default: STDERR]')
+                            help='Path to log errors [default: <STDERR>]')
         parser.add_argument('--log-level',
                             metavar='LEVEL',
                             nargs='?',
-                            type=lambda level: cls.LOG_LEVELS.get(level, level),
-                            choices=cls.LOG_LEVELS.items(),
-                            help="Level of information to display from task logger")
+                            choices=cls.LOG_LEVELS.keys(),
+                            help="Level of information to display from task logger [default: %(default)s]")
         parser.add_argument('--debug',
                             action='store_true',
-                            help="Show debugging information on failure")
+                            help="Show debugging information on failure [default: %(default)s]")
         return parser
 
     @classmethod
@@ -202,7 +182,7 @@ class Task(object):
         return {
             'output': stdout,
             'log': stderr,
-            'log_level': 'INFO',
+            'log_level': 'WARNING',
             'debug': False,
         }
 
@@ -222,15 +202,13 @@ class Task(object):
         """
         This is just a simple usage example. Fancy argument parsing needs to be enabled
         """
+        environ = environ or os.environ
         conf = {
-          'stdin': stdin,
-          'stdout': stdout,
-          'stderr': stderr,
+            'stdin': stdin,
+            'stdout': stdout,
+            'stderr': stderr,
+            'environ': environ,
         }
-        if environ is not None:
-            conf['environ'] = environ
-        else:
-            conf['environ'] = os.environ
 
         if _sys_args:
           conf['task_name'] = args[0]
@@ -240,28 +218,38 @@ class Task(object):
 
         parser = cls.parser(**conf)
         parser = cls.arguments(parser=parser, **conf)
+        parser.set_defaults(**cls.defaults(stdin, stdout, stderr, environ))
         params = parser.parse_args(args)
         task = cls.from_namespace(params, conf=conf)
         try:
             task.run()
             status = task.task_status
-        except Exception:
+        except Exception as e:
+            task.logger.error(str(e))
             if task.debug:
                 raise
-            elif task.task_status == cls.STATUS_OK:
-                status = cls.STATUS_GENERAL_FAILURE
+            elif task.task_status == TaskFailure.STATUS_OK:
+                status = TaskFailure.STATUS_GENERAL_FAILURE
             else:
                 status = task.task_status
         return status
 
     @classmethod
-    def create_subtask(cls, parent=None, params=None, conf=None, remap=None, override=None, hide=None):
+    def create_subtask(cls, parent=None, params=None, conf=None, remap=None, override=None, hide=None, tag=None):
         conf = conf or getattr(parent, 'conf', {})
         params = params or getattr(parent, 'params', Namespace())
 
         new_params = copy.copy(params)
         new_conf = conf.copy()
         new_conf = cls.fill_conf(new_conf)
+
+        task_name = cls.task_name()
+        if parent:
+            task_name = '{}.{}'.format(parent.current_task_name, task_name)
+        if tag:
+            task_name = '{}:{}'.format(task_name, tag)
+
+        conf['task_name'] = task_name
 
         remap = remap or {}
         override = override or {}
@@ -287,18 +275,11 @@ class Task(object):
 
     @classmethod
     def run_as_script(cls):
-        try:
-            code =  cls.main(args=sys.argv,
-                             stdin=sys.stdin,
-                             stdout=sys.stdout,
-                             stderr=sys.stderr,
-                             environ=os.environ,
-                             _sys_args=True)
-        except TaskFailure as e:
-            print("Failure: {0}".format(e), file=sys.stderr)
-            raise
-        except Exception as e:
-            print("Error: {0}".format(e), file=sys.stderr)
-            raise
+        code =  cls.main(args=sys.argv,
+                         stdin=sys.stdin,
+                         stdout=sys.stdout,
+                         stderr=sys.stderr,
+                         environ=os.environ,
+                         _sys_args=True)
 
         return code

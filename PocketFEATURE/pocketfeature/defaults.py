@@ -16,6 +16,12 @@ from pocketfeature.algorithms import (
 )
 from pocketfeature.datastructs.residues import CenterCalculator
 
+LIGAND_RESIDUE_DISTANCE = 6.0
+IGNORE_DISORDERED_RESIDUES = True
+
+DEFAULT_BACKGROUND_STATISTICS_FILE = 'background.ff'
+DEFAULT_BACKGROUND_NORMALIZATION_FILE = 'background.coeff'
+
 # Each residue consists of some number of "centers" or active sits
 # Each of which is defined by one or more atoms in the residue
 DEFAULT_CENTERS = {

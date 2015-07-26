@@ -20,5 +20,9 @@ Python interface to the Stanford FEATURE biomolecular structure analysis tools""
           'sh',
           'six',
       ],
-      entry_points={}
+      entry_points={
+            'console_scripts': [
+                  'py-featurize = feature.tasks:Featurize.run_as_script',
+            ]
+      }
 )
