@@ -13,6 +13,7 @@ from six import (
 from feature.io import metadata
 
 from pocketfeature.algorithms import Indexer
+from pocketfeature.datastructs.metadata import PocketFeatureMatrixValuesMetaData
 from pocketfeature.datastructs.matrixvalues import MatrixValues
 
 
@@ -35,20 +36,23 @@ def _get_value_columns(values, accepted, cast):
         return len(values), values
 
 
-def load(io, dims=2, delimiter=None, 
-                     columns=None, 
-                     cast=None, 
-                     make_key=tuple, 
-                     value_dims=None, 
-                     header=False,
-                     load_metadata=False):
+def load(io,
+         dims=2,
+         delimiter=None,
+         columns=None,
+         cast=None,
+         make_key=tuple,
+         value_dims=None,
+         header=False,
+         load_metadata=True,
+         metadata_type=PocketFeatureMatrixValuesMetaData):
     if load_metadata:
-        md, io = metadata.extract_metadata(io)
+        md, io = metadata.extract_metadata(io, container=metadata_type.from_raw_fields)
     else:
         md = None
     column_names = None
     if not header and md is not None:
-        column_names = md.get('COLUMNS')
+        column_names = md.get('VALUE_FIELDS')
 
     positions = []
     indexes = [Indexer() for _ in range(dims)]
@@ -76,10 +80,18 @@ def load(io, dims=2, delimiter=None,
     else:
         value_dims = value_count
 
-    return MatrixValues(positions, indexes, value_dims=value_dims)
+    return MatrixValues(positions, indexes,
+                        value_dims=value_dims,
+                        metadata=md)
 
 
-def dump(matrix_values, io, delimiter="\t", columns=None, tpl="{:.3f}", header=False):
+def dump(matrix_values, io,
+         delimiter="\t",
+         columns=None,
+         tpl="{!r}",
+         header=False):
+    if matrix_values.metadata is not None:
+        metadata.dump(matrix_values.metadata, io)
     columns = set(columns) if columns is not None else None
     if header and len(matrix_values.dim_refs) > 0:
         row = ["INDEX"] * matrix_values.dims

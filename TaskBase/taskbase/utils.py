@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import logging
 
 
@@ -12,6 +14,7 @@ def setdefaults(d, defaults):
         d.setdefault(k, v)
 
     return d
+
 
 
 class TaskFailure(RuntimeError):

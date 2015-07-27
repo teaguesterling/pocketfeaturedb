@@ -48,6 +48,9 @@ class Task(object):
     def load_inputs(self):
         pass
 
+    def prepare_subtasks(self):
+        pass
+
     def execute(self):
         pass
 
@@ -94,6 +97,8 @@ class Task(object):
                 notify = getattr(self.logger, level)
                 notify(message.format(name))
             writer(data, destination)
+        else:
+            self.logger.debug(("NOT " + message).format(destination))
         return data
 
     def failed(self, message, reason=None, code=1):
@@ -104,12 +109,17 @@ class Task(object):
         try:
             self.logger.debug("Setting up parameters")
             self.setup()
+
             self.logger.debug("Loading inputs")
             self.load_inputs()
+
             self.logger.debug("Executing task")
+            self.prepare_subtasks()
             self.execute()
+
             self.logger.debug("Generating output")
             r = self.produce_results()
+
             self.task_result = r
         except TaskFailure as e:
             self.task_status = e.code
@@ -124,6 +134,16 @@ class Task(object):
         else:
             self.task_status = TaskFailure.STATUS_OK
         return self.task_result
+
+    def run_subtask(self, **kwargs):
+        self.apply_setup(params=None,
+                         defaults=(),
+                         overrides=kwargs,
+                         mappings=kwargs.keys())
+        self.execute()
+        result = self.produce_results()
+        return result
+
 
     @classmethod
     def task_arguments(cls, parser, stdin, stdout, stderr, environ, **kwargs):
@@ -217,7 +237,7 @@ class Task(object):
           conf['task_name'] = cls.task_name()
 
         parser = cls.parser(**conf)
-        parser = cls.arguments(parser=parser, **conf)
+        cls.arguments(parser=parser, **conf)
         parser.set_defaults(**cls.defaults(stdin, stdout, stderr, environ))
         params = parser.parse_args(args)
         task = cls.from_namespace(params, conf=conf)

@@ -1,10 +1,8 @@
-#!/usr/bin/env python
+from __future__ import absolute_import
 
 from six import text_type
 
 from feature.io.pointfile import PDBPoint
-
-from pocketfeature import defaults
 
 
 class Pocket(object):
@@ -16,11 +14,9 @@ class Pocket(object):
     def __init__(self, residues, pdbid=None,
                                  defined_by=None,
                                  name=None,
-                                 residue_centers=defaults.DEFAULT_RESIDUE_CENTERS,
+                                 residue_centers=None,
                                  points=None,
                                  skip_partial_residues=True):
-        if isinstance(residue_centers, text_type):
-            residue_centers = defaults.NAMED_RESIDUE_CENTERS[residue_centers]
         self._pdbid = pdbid
         self._residues = residues
         self._defined_by = defined_by
@@ -93,7 +89,10 @@ class Pocket(object):
 
     def _get_microenvironments(self, residue):
         skip = self._skip_partial_residues
-        return self._centers(residue, skip_partial_residues=skip)
+        if self._centers is None:
+            return [a.get_coords() for a in residue]
+        else:
+            return self._centers(residue, skip_partial_residues=skip)
 
     def setResidueCenters(self, residue_centers):
         self._centers = residue_centers

@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from six import string_types
 
+
 class PDBFocus(object):
     """ Provides a consistent interface for looking at a specific model or
         chain in a BioPython PDB Structure that can be easily changed.

@@ -14,10 +14,12 @@ from pocketfeature.algorithms import (
     scale_score_to_alignment_tanimoto,
     scale_score_to_alignment_evalue,
 )
-from pocketfeature.datastructs.residues import CenterCalculator
 
-LIGAND_RESIDUE_DISTANCE = 6.0
-IGNORE_DISORDERED_RESIDUES = True
+DEFAULT_LIGAND_RESIDUE_DISTANCE = 6.0
+DEFAULT_IGNORE_DISORDERED_RESIDUES = True
+
+DEFAULT_SCORE_CUTOFF = 0.0
+DEFAULT_SCORE_COLUMN = 1
 
 DEFAULT_BACKGROUND_STATISTICS_FILE = 'background.ff'
 DEFAULT_BACKGROUND_NORMALIZATION_FILE = 'background.coeff'
@@ -76,12 +78,12 @@ NORMALIZED_SCORE = 'normalized'
 # None values represent defaults
 
 NAMED_RESIDUE_CENTERS = {
-    'standard': CenterCalculator(DEFAULT_CENTERS, DEFAULT_CLASSES),
+    'standard': (DEFAULT_CENTERS, DEFAULT_CLASSES),
 }
 
 ALLOWED_VECTOR_TYPE_PAIRS = {
-    'all': CenterCalculator.get_all_code_pairs,
-    'classes': CenterCalculator.get_class_code_pairs,
+    'all': lambda cc: cc.get_all_code_pairs(),
+    'classes': lambda cc: cc.get_class_code_pairs(),
 }
 
 ALLOWED_SIMILARITY_METHODS = {
@@ -115,3 +117,7 @@ DEFAULT_SIMILARITY_METHOD = 'tversky22'
 DEFAULT_NORMALIZE_METHOD = 'normalize'
 DEFAULT_ALIGNMENT_METHOD = 'onlybest'
 DEFAULT_SCALE_FUNCTION = 'none'
+
+
+COUNT_COMMENT = 'N'
+RESIDUE_TYPE = 'RESIDUE_TYPE'

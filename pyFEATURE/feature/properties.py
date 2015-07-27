@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import numpy as np
-from six import StringIO
+from six import moves
 
 
 def property_dtype(property):
@@ -14,7 +14,8 @@ def property_dtype(property):
 class StaticDefaultMixin(object):
     @property
     def mutable_type(self):
-        return type(self).__base__ 
+        return type(self).__base__
+
     def redefine(self, *args, **kwargs):
         return self.mutable_type(*args, **kwargs)
 
@@ -142,7 +143,7 @@ def dumps(props):
         Returns: String representation of PropertyList
 
     """
-    buf = StringIO()
+    buf = moves.StringIO()
     dump(buf, props)
     return buf.getvalue()
 

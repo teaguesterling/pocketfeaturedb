@@ -12,8 +12,8 @@ from .residues import (
 )
 
 from .metadata import (
-    PocketFeatureMetaData,
-    PocketFeatureBackgroundMetaData,
+    PocketFeaturePointFileMetaData,
+    PocketFeatureBackgroundStatisticsMetaData,
 )
 from .matrixvalues import (
     MatrixValues,

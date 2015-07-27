@@ -1,23 +1,32 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
+import os
+
+from six import text_type
+
 from taskbase import (
-    decompress,
+    FileType,
     Task,
     TaskFailure,
+    use_file,
 )
 
 from feature.io import pointfile
+from feature.io.locate_files import find_pdb_file
+from pocketfeature.datastructs.residues import CenterCalculator
 from pocketfeature.io import (
+    centersfile,
     pdbfile,
     residuefile,
 )
 from pocketfeature.utils.pdb import (
     guess_pdbid_from_stream,
     list_ligands,
+    get_pdb_from_residue_code,
 )
 from pocketfeature.utils.args import (
-    decompress,
+    comma_delimited_list,
     ProteinFileType,
 )
 
@@ -30,19 +39,28 @@ from pocketfeature.operations.pockets import (
 )
 
 from pocketfeature.defaults import (
-    IGNORE_DISORDERED_RESIDUES,
-    LIGAND_RESIDUE_DISTANCE,
+    DEFAULT_IGNORE_DISORDERED_RESIDUES,
+    DEFAULT_LIGAND_RESIDUE_DISTANCE,
+    DEFAULT_RESIDUE_CENTERS,
+    NAMED_RESIDUE_CENTERS,
 )
 
 
-class PocketExtractor(Task):
+class PocketExtraction(Task):
+    DEFAULT_LIGAND_RESIDUE_DISTANCE = DEFAULT_LIGAND_RESIDUE_DISTANCE
+    DEFAULT_IGNORE_DISORDERED_RESIDUES = DEFAULT_IGNORE_DISORDERED_RESIDUES
+    DEFAULT_RESIDUE_CENTERS = DEFAULT_RESIDUE_CENTERS
+    RESIDUE_CENTERS = NAMED_RESIDUE_CENTERS
+
     pdbid = None
     pdb = None
     model = None
     chain = None
-    ligand = None
+    ligand_name = None
     distance = None
     ignore_disordered = None
+    residue_centers = None
+    residue_centers_file = None
     output = None
     list_only = None
     print_residues = None
@@ -57,7 +75,7 @@ class PocketExtractor(Task):
         self.setup_outputs(params, defaults=defaults, **kwargs)
 
     def load_inputs(self):
-        structure = pdbfile.load(self.pdb, pdbid=self.pdbid)
+        structure = pdbfile.load(use_file(self.pdb), pdbid=self.pdbid)
         self.structure = structure
 
     def execute(self):
@@ -70,7 +88,12 @@ class PocketExtractor(Task):
             self.run_create_pocket()
 
     def produce_results(self):
-        if self.print_residues:
+        if self.list_only:
+            return self.generate_output(residuefile.dump,
+                                        self.ligands,
+                                        self.output,
+                                        'Writing residue list to {}')
+        elif self.print_residues:
             return self.generate_output(residuefile.dump,
                                         self.pocket.residues,
                                         self.output,
@@ -87,10 +110,17 @@ class PocketExtractor(Task):
             'pdb',
             'model',
             'chain',
-            'ligand'
         ))
+        self.apply_setup(params, kwargs, defaults, {'ligand_name': 'ligand'})
 
-        self.pdb = decompress(self.pdb)
+        if self.pdb is None:
+            self.setup_guess_pdb()
+
+            if not os.path.exists(self.pdb):
+                self.pdb = find_pdb_file(self.pdb)
+            self.logger.warning("Guessing PDB file. Found {}".format(self.pdb))
+
+        self.pdb = use_file(self.pdb)
 
         if self.pdbid is None:
             pdbid, pdb = guess_pdbid_from_stream(self.pdb)
@@ -103,11 +133,25 @@ class PocketExtractor(Task):
         if self.chain == '-':
             self.chain = None
 
+    def setup_guess_pdb(self):
+        for code in self.ligand_name:
+            guess = get_pdb_from_residue_code(code)
+            if guess is not None:
+                self.pdb = guess
+                #self.pdbid = guess
+                break
+
     def setup_params(self, params=None, defaults=None, **kwargs):
         self.apply_setup(params, kwargs, defaults, (
             'distance',
             'ignore_disordered',
+            'residue_centers',
+            'residue_centers_file',
         ))
+        if self.residue_centers_file is not None:
+            self.center_picker = centersfile.load(self.residue_centers_file)
+        else:
+            self.center_picker = CenterCalculator(*self.RESIDUE_CENTERS[self.residue_centers])
 
     def setup_outputs(self, params=None, defaults=None, **kwargs):
         self.apply_setup(params, kwargs, defaults, (
@@ -126,13 +170,13 @@ class PocketExtractor(Task):
         self.ligands = ligands
 
     def run_find_ligand(self):
-        if not self.ligand:
+        if not self.ligand_name:
             self.logger.warning("No ligand provided. Making best guess.")
             self.ligand = pick_best_ligand(self.focus)
-        elif len(self.ligand) == 1:
-            self.ligand = find_ligand_in_structure(self.focus, self.ligand[0])
+        elif len(self.ligand_name) == 1:
+            self.ligand = find_ligand_in_structure(self.focus, self.ligand_name[0])
         else:
-            self.ligand = find_one_of_ligand_in_structure(self.focus, self.ligand)
+            self.ligand = find_one_of_ligand_in_structure(self.focus, self.ligand_name)
 
         if self.ligand is None:
             raise self.failed("Could not find ligand in structure", code=TaskFailure.STATUS_INPUT_FAILURE)
@@ -142,13 +186,14 @@ class PocketExtractor(Task):
     def run_create_pocket(self):
         pocket = create_pocket_around_ligand(self.focus, self.ligand,
                                              cutoff=self.distance,
-                                             expand_disordered=not self.ignore_disordered)
+                                             expand_disordered=not self.ignore_disordered,
+                                             residue_centers=self.center_picker)
         self.pocket = pocket
 
         self.num_residues_found = len(pocket.residues)
 
         if self.num_residues_found == 0:
-            raise self.failed("No residues found within {0} angstroms of {1}".format(self.distance, self.ligand),
+            raise self.failed("No residues found within {0} angstroms of {1}".format(self.distance, self.ligand_name),
                               code=TaskFailure.STATUS_EMPTY_DATA)
         else:
             self.logger.debug("Created pocket with {:d} residues".format(self.num_residues_found))
@@ -159,23 +204,25 @@ class PocketExtractor(Task):
             'ligand': None,
             'pdbid': None,
             'model': 0,
-            'chain': '-',
+            'chain': None,
         }
 
     @classmethod
     def parameter_defaults(cls, stdin, stdout, stderr, environ, **kwargs):
         return {
-            'distance': LIGAND_RESIDUE_DISTANCE,
-            'ignore_disordered': IGNORE_DISORDERED_RESIDUES,
+            'distance': cls.DEFAULT_LIGAND_RESIDUE_DISTANCE,
+            'ignore_disordered': cls.DEFAULT_IGNORE_DISORDERED_RESIDUES,
+            'residue_centers': cls.DEFAULT_RESIDUE_CENTERS,
+            'residue_centers_file': None,
         }
 
     @classmethod
     def defaults(cls, stdin, stdout, stderr, environ, **kwargs):
-        defaults = super(PocketExtractor, cls).defaults(stdin, stdout, stderr, environ, **kwargs)
+        defaults = super(PocketExtraction, cls).defaults(stdin, stdout, stderr, environ, **kwargs)
         defaults.update(cls.input_defaults(stdin, stdout, stderr, environ, **kwargs))
         defaults.update(cls.parameter_defaults(stdin, stdout, stderr, environ, **kwargs))
         defaults.update({
-            'pdb': stdin,
+            'pdb': None,
             'print_pointfile': True,
             'print_residues': False,
             'list_only': False,
@@ -196,20 +243,20 @@ class PocketExtractor(Task):
                             type=ProteinFileType.compressed('r'),
                             nargs='?',
                             help='Path to PDB file [default: STDIN]')
-        parser.add_argument('ligand',
+        parser.add_argument('-L', '--ligand',
                             metavar='LIG',
-                            type=str,
+                            type=comma_delimited_list,
                             nargs='?',
                             help='Ligand ID to build pocket around [default: <largest>]')
-        parser.add_argument('-i', '--pdbid',
+        parser.add_argument('--pdbid',
                             metavar='PDBID',
                             type=str,
                             help='PDB ID to use for input structure [default: BEST GUESS]')
-        parser.add_argument('-m', '--model',
+        parser.add_argument('--model',
                             metavar='MODEL_NUMBER',
                             type=int,
                             help='Model index to input structure (-1 for all) [default: %(default)s]')
-        parser.add_argument('-c', '--chain',
+        parser.add_argument('--chain',
                             metavar='CHAIN_ID',
                             type=str,
                             help='Chain id to input structure (- for all) [default: %(default)s]')
@@ -224,6 +271,15 @@ class PocketExtractor(Task):
         parser.add_argument('-I', '--ignore-disordered',
                             action='store_true',
                             help='Ignore additional coordinates for atoms [default: %(default)s]')
+        centers_group = parser.add_mutually_exclusive_group()
+        centers_group.add_argument('--residue-centers',
+                                   metavar='RESIDUE_CENTERS',
+                                   choices=cls.RESIDUE_CENTERS.keys(),
+                                   help="Residue center/class file to use for extraction (on of %(choices)s) [default: %(default)s]")
+        centers_group.add_argument('--residue-centers-file',
+                                   metavar='CENTERS_FILE',
+                                   type=FileType('r'),
+                                   help="Path of residue centers file to use [default: Not Used]")
         return parser
 
     @classmethod
@@ -234,7 +290,7 @@ class PocketExtractor(Task):
         parser.add_argument('-R', '--print-residues',
                             action='store_true',
                             help='Print residue ID list instead of point file')
-        parser.add_argument('-L', '--list-only',
+        parser.add_argument('--list',
                             action='store_true',
                             help='List residues instead of creating pocket')
 
@@ -248,4 +304,4 @@ class PocketExtractor(Task):
 
 if __name__ == '__main__':
     import sys
-    sys.exit(PocketExtractor.run_as_script())
+    sys.exit(PocketExtraction.run_as_script())

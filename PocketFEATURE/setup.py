@@ -27,9 +27,10 @@ setup(name='PocketFEATURE',
       ],
       entry_points={
         'console_scripts': [
-            pf_task_script('extract:PocketExtractor', 'pf-extract'),
-            pf_task_script('compare:FeatureFileCompare', 'pf_compare'),
-            pf_task_script('align:AlignScores', 'pf_align'),
+            pf_task_script('extract:PocketExtraction', 'pf-extract'),
+            pf_task_script('compare:FeatureFileComparison', 'pf-compare'),
+            pf_task_script('align:ScoreAlignment', 'pf-align'),
+            pf_task_script('rmsd:AlignmentRmsdComputation', 'pf-rmsd'),
             pf_task_script('visualize:VisAlign', 'pf_vis'),
             pf_task_script('full_comparison:ComparePockets', 'run_pf'),
             pf_task_script('build_background:GeneratePocketFeatureBackground', 'pf_genbg'),

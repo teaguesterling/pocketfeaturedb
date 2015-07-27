@@ -11,7 +11,7 @@ from pocketfeature.utils.ff import (
     get_vector_type,
 )
 
-
+from pocketfeature.datastructs.residues import CenterCalculator
 from pocketfeature.datastructs.background import (
     BackgroundEnvironment,
     MEAN_VECTOR,
@@ -19,8 +19,12 @@ from pocketfeature.datastructs.background import (
     NORM_COLUMN,
 )
 from pocketfeature.datastructs.residues import make_vector_type_key
-from pocketfeature.datastructs.metadata import PocketFeatureBackgroundMetaData
+from pocketfeature.datastructs.metadata import (
+    PocketFeatureBackgroundStatisticsMetaData,
+    PocketFeatureBackgroundNormalizationsMetaData,
+)
 
+from pocketfeature.io import centersfile
 from pocketfeature.io import residuefile
 from pocketfeature.io import featurefile
 from pocketfeature.io import matrixvaluesfile
@@ -28,7 +32,7 @@ from pocketfeature.io import matrixvaluesfile
 
 def load_normalization_data(io, column=0, metadata=None):
     if metadata is None:
-        metadata = PocketFeatureBackgroundMetaData()
+        metadata = PocketFeatureBackgroundStatisticsMetaData()
     norms = matrixvaluesfile.load(io, cast=float,
                                       make_key=make_vector_type_key,
                                       header=True)
@@ -37,7 +41,7 @@ def load_normalization_data(io, column=0, metadata=None):
 
 def load_stats_data(io, metadata=None):
     if metadata is None:
-        metadata = PocketFeatureBackgroundMetaData()
+        metadata = PocketFeatureBackgroundStatisticsMetaData()
     stats_ff = featurefile.load(io, metadata=metadata, rename_from_comment=None)
     return stats_ff
 
@@ -63,7 +67,9 @@ def load(stats_file, norms_file,
          allowed_pairs=None,
          std_threshold=1.0):
     if metadata is None:
-        metadata = PocketFeatureBackgroundMetaData()
+        metadata = PocketFeatureBackgroundNormalizationsMetaData()
+    else:
+        metadata = metadata
     stats_ff = load_stats_data(stats_file, metadata)
     stats_bgs = load_normalization_data(norms_file, metadata)
 
@@ -90,10 +96,25 @@ def load(stats_file, norms_file,
     else:
         mean = None
 
-    compare_function = compare_function or defaults.DEFAULT_SIMILARITY_METHOD
+    if compare_function is None:
+        try:
+            compare_function = metadata['COMPARISON_METHOD']
+        except KeyError:
+            compare_function = defaults.DEFAULT_SIMILARITY_METHOD
+
+    if allowed_pairs is None:
+        try:
+            allowed_pairs = metadata['RESIDUE_PAIR_TYPES']
+        except KeyError:
+            allowed_pairs = defaults.ALLOWED_VECTOR_TYPE_PAIRS
+
+    if centers is None:
+        try:
+            centers = centersfile.load_from_metadata(metadata)
+        except KeyError:
+            centers = defaults.DEFAULT_RESIDUE_CENTERS
+
     normalize_function = normalize_function or defaults.DEFAULT_NORMALIZE_METHOD
-    allowed_pairs = allowed_pairs or defaults.ALLOWED_VECTOR_TYPE_PAIRS
-    centers = centers or defaults.DEFAULT_RESIDUE_CENTERS
 
     background = wrapper(std_dev=std_dev,
                          mean=mean,

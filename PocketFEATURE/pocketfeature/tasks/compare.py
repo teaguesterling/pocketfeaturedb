@@ -6,6 +6,7 @@ import os
 from taskbase import (
     Task,
     FileType,
+    use_file,
 )
 
 from pocketfeature.io import (
@@ -14,7 +15,7 @@ from pocketfeature.io import (
     matrixvaluesfile,
 )
 from pocketfeature.datastructs import PassThroughItems
-
+from pocketfeature.datastructs.metadata import PocketFeatureScoresMatrixMetaData
 from pocketfeature.defaults import (
     ALLOWED_SIMILARITY_METHODS,
     ALLOWED_VECTOR_TYPE_PAIRS,
@@ -49,17 +50,39 @@ class FeatureFileComparison(Task):
         self.setup_inputs(params, defaults=defaults, **kwargs)
 
     def load_inputs(self):
-        self.background = self.load_background()
-        self.featuresA = featurefile.load(self.feature_fileA)
-        self.featuresB = featurefile.load(self.feature_fileB)
+        self.load_background = backgroundfile.load(
+            stats_file=use_file(self.statistics),
+            norms_file=use_file(self.normalizations),
+            allowed_pairs=self.allowed_pairs,
+            compare_function=self.comparison_method)
+        self.featuresA = featurefile.load(use_file(self.feature_fileA))
+        self.featuresB = featurefile.load(use_file(self.feature_fileB))
 
     def execute(self):
-        scores = self.background.get_comparison_matrix(self.featuresA,
-                                                       self.featuresB,
-                                                       matrix_wrapper=PassThroughItems)
+        self.run_comparison_matrix()
+        self.run_clean_annotate_results()
+
+    def run_comparison_matrix(self):
+        vectorsA = self.featuresA
+        vectorsB = self.featuresB
+        scores = self.background.get_comparison_matrix(vectorsA, vectorsB, matrix_wrapper=PassThroughItems)
+        self.original_scores = scores
+
+    def run_clean_annotate_results(self):
+        scores = self.original_scores
+        fileA_name = getattr(self.feature_fileA, 'name', '<stream>')
+        fileB_name = getattr(self.feature_fileB, 'name', '<stream>')
+        bg_stats_name = getattr(self.statistics, 'name', '<stream>')
+        bg_norms_name = getattr(self.normalizations, 'name', '<stream>')
+        scores = scores.round_values(4)
+        scores.metadata = self.background.metadata.propagate(kind=PocketFeatureScoresMatrixMetaData,
+                                                             FEATURE_FILE_A=fileA_name,
+                                                             FEATURE_FILE_B=fileB_name,
+                                                             BACKGROUND_STATS_FILE=bg_stats_name,
+                                                             BACKGROUND_NORMS_FILE=bg_norms_name)
         self.scores = scores
 
-    def produce_result(self):
+    def produce_results(self):
         return self.generate_output(matrixvaluesfile.dump,
                                     self.scores,
                                     self.output,
@@ -67,16 +90,22 @@ class FeatureFileComparison(Task):
 
     def setup_params(self, params, defaults=None, **kwargs):
         self.apply_setup(params, kwargs, defaults, {
-            'comparison_method_name': 'method',
-            'allowed_pairs_name': 'pairs',
+            'comparison_method_name': 'comparison_method',
+            'allowed_pairs_name': 'allowed_pairs',
         })
         self.apply_setup(params, kwargs, defaults, (
             'statistics',
             'normalizations',
         ))
 
-        self.comparison_method = self.COMPARISON_METHODS[self.comparison_method_name]
-        self.allowed_pairs = self.VECTOR_TYPE_PAIRS[self.allowed_pairs_name]
+        if self.comparison_method_name is not None:
+            self.comparison_method = self.COMPARISON_METHODS[self.comparison_method_name]
+        else:
+            self.comparison_method = None
+        if self.allowed_pairs_name is not None:
+            self.allowed_pairs = self.VECTOR_TYPE_PAIRS[self.allowed_pairs_name]
+        else:
+            self.allowed_pairs = None
 
     def setup_inputs(self, params, defaults=None, **kwargs):
         self.apply_setup(params, kwargs, defaults, (
@@ -84,19 +113,14 @@ class FeatureFileComparison(Task):
             'feature_fileB',
         ))
 
-    def load_background(self):
-        return backgroundfile.load(stats_file=self.statistics,
-                                   norms_file=self.normalizations,
-                                   allowed_pairs=self.allowed_pairs,
-                                   compare_function=self.comparison_method)
-
     @classmethod
     def parser(cls, stdin, stdout, stderr, environ, task_name):
         from argparse import ArgumentParser
         parser = ArgumentParser(prog=task_name,
                                 description="""Compute tanimoto matrix for two FEATURE vectors with a background
                                                and score normalizations. If background files are not provided, they
-                                               will be checked for in the current directory as well as FEATURE_DIR""")
+                                               will be checked for in the current directory as well as FEATURE_DIR.
+                                               By default the comparison method will be chosen from the background""")
         return parser
 
     @classmethod
@@ -117,18 +141,18 @@ class FeatureFileComparison(Task):
                             metavar='FEATURESTATS',
                             type=FileType.compressed('r'),
                             help='FEATURE file containing standard devations of background [default: %(default)s]')
-        parser.add_argument('-n', '--normalization',
+        parser.add_argument('-n', '--normalizations',
                             metavar='COEFFICIENTS',
                             type=FileType.compressed('r'),
                             help='Map of normalization coefficients for residue type pairs [default: %(default)s]')
-        parser.add_argument('-S', '--comparison-method',
+        parser.add_argument('--comparison-method',
                             metavar='COMPARISON_METHOD',
                             choices=cls.COMPARISON_METHODS.keys(),
-                            help='Scoring mehtod to use (one of %(choices)s) [default: %(default)s]')
-        parser.add_argument('-p', '--allowed-pairs',
+                            help='Scoring method to force (one of %(choices)s) [default: %(default)s]')
+        parser.add_argument('--allowed-pairs',
                             metavar='PAIR_SET_NAME',
                             choices=cls.VECTOR_TYPE_PAIRS.keys(),
-                            help='Pair selection method to use (one of: %(choices)s) [default: %(default)s]')
+                            help='Pair selection method force (one of: %(choices)s) [default: %(default)s]')
 
     @classmethod
     def input_arguments(cls, parser, stdin, stdout, stderr, environ, **kwargs):

@@ -2,7 +2,7 @@
 
 from six import string_types
 from feature.io.featurefile import DESCRIPTION
-from pocketfeature.datastructs.metadata import RESIDUE_TYPE
+from pocketfeature.defaults import RESIDUE_TYPE
 from pocketfeature.utils.pdb import (
     residue_code_one_to_three,
     residue_code_three_to_one,

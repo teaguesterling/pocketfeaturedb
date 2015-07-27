@@ -57,6 +57,7 @@ feature_environ = {
 default_environ = os.environ.copy()
 default_environ.update(feature_environ)
 
+
 def update_default_environ_from_feature_path(found_path):
     global FEATURE_DIR
     if not os.path.exists(default_environ['FEATURE_DIR']):

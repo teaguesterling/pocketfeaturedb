@@ -11,8 +11,8 @@ from six import (
 )
 
 from pocketfeature import defaults
-from pocketfeature.datastructs.residues import make_vector_type_key
-from pocketfeature.io.matrixvaluesfile import MatrixValues
+from pocketfeature.datastructs.residues import CenterCalculator
+from pocketfeature.datastructs.matrixvalues import MatrixValues
 from pocketfeature.utils.ff import get_vector_type
 
 MEAN_VECTOR = 'MEAN'
@@ -42,7 +42,7 @@ class BackgroundEnvironment(object):
                                 allowed_pairs=defaults.ALLOWED_VECTOR_TYPE_PAIRS,
                                 std_threshold=1.0):
         if isinstance(residue_centers, string_types):
-            residue_centers = defaults.NAMED_RESIDUE_CENTERS[residue_centers]
+            residue_centers = CenterCalculator(*defaults.NAMED_RESIDUE_CENTERS[residue_centers])
         if isinstance(allowed_pairs, string_types):
             allowed_pairs = defaults.ALLOWED_VECTOR_TYPE_PAIRS[allowed_pairs]
         if isinstance(compare_function, string_types):
@@ -152,6 +152,10 @@ class BackgroundEnvironment(object):
     @property
     def normalizations(self):
         return self._normalizations
+
+    @property
+    def metadata(self):
+        return self._metadata
 
     def scale_alignment_score(self, sizes, score):
         return self._scale_fn(self._scale_params, sizes, score)

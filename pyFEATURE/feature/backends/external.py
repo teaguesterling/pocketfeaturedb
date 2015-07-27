@@ -11,8 +11,6 @@
 """
 from __future__ import print_function
 import gzip
-import os
-import sys
 
 import sh
 

@@ -2,9 +2,16 @@ from __future__ import absolute_import, print_function
 
 from collections import defaultdict
 
-from six import StringIO
+from six import moves
 
 from pocketfeature.datastructs.residues import CenterCalculator
+
+
+def load_from_metadata(metadata, key='RESIDUE_CENTERS'):
+    if key not in metadata:
+        raise KeyError()
+    else:
+        raise NotImplemented()
 
 
 def loadi(it,
@@ -71,7 +78,7 @@ def loads(data,
           comments_delimiter='#',
           field_delimiter='\t',
           atom_delimiter=','):
-    it = StringIO(data)
+    it = moves.StringIO(data)
     return loadi(it,
                  wrapper=wrapper,
                  wrapper_args=wrapper_args,
@@ -124,7 +131,7 @@ def dumps(calculator,
           comments_delimiter='#',
           field_delimiter='\t',
           atom_delimiter=','):
-    buf = StringIO()
+    buf = moves.StringIO()
     dump(buf, calculator,
          use_classes=use_classes,
          comments_delimiter=comments_delimiter,

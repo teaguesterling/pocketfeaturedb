@@ -14,6 +14,10 @@ from feature.io.locate_files import (
 )
 
 
+def comma_delimited_list(data):
+    return data.split(',')
+
+
 class ProteinFileType(FileType):
     TYPES = {
         'pdb': find_pdb_file,
@@ -21,12 +25,13 @@ class ProteinFileType(FileType):
     }
 
     def __init__(self, file_format='pdb', mode='r', *args, **kwargs):
-        super(ProteinFileType, self).__init__(mode=mode, *args, **kwargs)
+        super(ProteinFileType, self).__init__(mode=mode, **kwargs)
         self.file_format = file_format.lower()
         self.locate = self.TYPES[self.file_format]
 
     def __call__(self, string):
         if string == '-':
+            name = string
             stream = super(ProteinFileType, self).__call__(string)
         else:
             try:

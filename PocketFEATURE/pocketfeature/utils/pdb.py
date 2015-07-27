@@ -111,6 +111,13 @@ def guess_pdbid_from_stream(stream):
     return pdbid, stream
 
 
+def get_pdb_from_residue_code(code):
+    try:
+        return code.strip('/').split('/', 1)[0]
+    except IndexError:
+        return None
+
+
 def is_het_residue(residue):
     het, seq, ins = residue.get_id()
     return len(het.strip()) > 0
@@ -187,12 +194,52 @@ def find_residues_by_name(structure, name):
     return found
 
 
-def find_residues_by_id(structure, query, full=True):
-    args = {'full': full}
-    query = set(query)
-    residues = structure.get_residues()
-    found = [res for res in residues if residue_id(res, **args) in query]
+def find_residues_by_id(structure, queries, full=True):
+    found = []
+    for query in queries:
+        if full:
+            pdb, model, chain, res_id, res_name = query
+        else:
+            model = None
+            chain = None
+            if isinstance(query, int):
+                res_id = query
+                res_name = None
+            elif isinstance(query, str):
+                res_id = None
+                res_name = query
+            else:
+                res_id, res_name = query[:2]
+
+        focus = structure
+        if model is not None and focus.get_level() != 'M':
+            focus = focus.get_list()[model]
+        elif focus.get_level == 'S':
+            focus = focus.get_chains()
+        else:
+            focus = focus.get_list()
+
+        if chain is not None :
+            focus = [c for c in focus if c.get_id() == chain]
+            if focus:
+                focus = focus[0]
+        else:
+            focus = (r for c in focus for r in c)
+
+        for residue in focus:
+            rn, ridx, _x = residue.get_id()
+            if rn == ' ':
+                rn = residue.get_resname()
+            elif len(rn) > 3 and rn.startswith('H_'):
+                rn = rn[2:]
+            if res_id is not None and ridx == res_id:
+                if res_name is None or res_name == rn:
+                    found.append(residue)
+            elif res_name is not None and res_name == rn:
+                if res_id is None or res_id == ridx:
+                    found.append(residue)
     return found
+
 
 
 def list_ligands(structure, is_ligand=is_ligand_residue):

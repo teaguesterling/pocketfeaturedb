@@ -25,7 +25,7 @@ from pocketfeature.algorithms import GaussianStats
 from pocketfeature.datastructs import (
     MatrixValues,
     PassThroughItems,
-    PocketFeatureBackgroundMetaData,
+    PocketFeatureBackgroundStatisticsMetaData,
     MEAN_VECTOR,
     MIN_VECTOR,
     MAX_VECTOR,
@@ -271,7 +271,7 @@ def _calculate_residue_pair_normalization_star(args):
 
 
 def create_background_features_from_stats(stats, **metadata_fields):
-    metadata = PocketFeatureBackgroundMetaData()
+    metadata = PocketFeatureBackgroundStatisticsMetaData()
     metadata.update(metadata_fields)
     comment = ["{0}".format(stats.n)]
 

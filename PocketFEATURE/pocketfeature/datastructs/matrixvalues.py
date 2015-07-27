@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import absolute_import
 
 from six import iteritems
 from collections import OrderedDict
@@ -10,8 +10,12 @@ from pocketfeature.algorithms import Indexer
 
 class MatrixValues(OrderedDict):
     """ A cheap attempt at storing sparse matrix information """
-    def __init__(self, entries=(), indexes=None, value_dims=None,
-                       default=None, metadata=None):
+    def __init__(self,
+                 entries=(),
+                 indexes=None,
+                 value_dims=None,
+                 default=None,
+                 metadata=None):
         if indexes is None:
             indexes = []
         self.indexes = indexes
@@ -47,8 +51,8 @@ class MatrixValues(OrderedDict):
                 self.indexes.append(Indexer())
             return self.indexes[i]
 
-    def __setitem__(self, key, value):
-        super(MatrixValues, self).__setitem__(key, value)
+    def __setitem__(self, key, value, dict_setitem=dict.__setitem__):
+        super(MatrixValues, self).__setitem__(key, value, dict_setitem=dict.__setitem__)
         for i, dim in enumerate(key):
             self._get_indexer(i).add(dim)
 
@@ -90,6 +94,27 @@ class MatrixValues(OrderedDict):
         values = cls(items, value_dims=self.value_dims)
         return values
 
+    def copy(self):
+        cls = type(self)
+        return cls(entries=self.items(),
+                   indexes=self.indexes,
+                   value_dims=self.value_dims,
+                   default=self.default,
+                   metadata=self.metadata and self.metadata.copy())
+
+    def round_values(self, places=3):
+        cls = type(self)
+        map_round = (lambda vs: [round(v, places) for v in vs] if isinstance(vs, (tuple, list)) else round(vs, places))
+        new_items = ((key, map_round(values)) for key, values in iteritems(self))
+        new = cls(
+            entries=new_items,
+            indexes=self.indexes,
+            value_dims=self.value_dims,
+            default=getattr(self, 'default', None),
+            metadata=self.metadata and self.metadata.copy())
+        return new
+
+
     @classmethod
     def from_array(cls, matrix, default=0, indexes=None, include_defaults=False):
         entries = []
@@ -98,9 +123,6 @@ class MatrixValues(OrderedDict):
                 if value != default or include_defaults:
                     entries.append(((i,j), value))
         return cls(entries, indexes)
-
-    def __repr__(self):
-        return 'MatrixValues({0})'.format(repr(self.items()))
 
 
 class PassThroughItems(object):
@@ -118,4 +140,14 @@ class PassThroughItems(object):
 
     def items(self):
         return self.entries
+
+    def round_values(self, places=3):
+        cls = type(self)
+        map_round = (lambda vs: [round(v, places) for v in vs] if isinstance(vs, (tuple, list)) else round(vs, places))
+        new_items = ((key, map_round(values)) for key, values in iteritems(self))
+        new = cls(entries=new_items,
+                  indexes=self.indexes,
+                  value_dims=self.value_dims,
+                  metadata=self.metadata and self.metadata.copy())
+        return new
 

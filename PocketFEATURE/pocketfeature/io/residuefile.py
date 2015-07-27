@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-from six import StringIO
+from six import moves
 from pocketfeature.utils.pdb import (
     find_residues_by_id,
     residue_id
@@ -8,32 +8,53 @@ from pocketfeature.utils.pdb import (
 
 DELIMITER = "/"
 PDB_ID = 0
+TPL = '/{!s}/{!s}/{!s}/{!s}`{!s}/'
 
 
 def write_residue_id(residue):
-    res_id = residue_id(residue)
-    return DELIMITER.join(map(str, res_id))
+    res_id = list(residue_id(residue, full=True))
+    res_id = ['' if item is None else item for item in res_id]
+    return TPL.format(*res_id)
 
 
 def read_residue_id(res_id):
     if isinstance(res_id, int):
         return res_id
-
+    res_id = res_id.strip(DELIMITER)
     tokens = res_id.split(DELIMITER)
     if len(tokens) == 1:
         return tokens[0]
+
+    pdb = tokens[0]
+    model = tokens[1]
+    chain = tokens[2]
+    res_name = tokens[3]
+    if '`' in res_name:
+        res, name = res_name.split('`', 1)
+        res = res
+    elif res_name.isdigit():
+        res = res_name
+        name = None
     else:
-        pdb, model, chain, res, name = tokens
-        return (pdb, int(model), chain, int(res), name)
+        res = None
+        name = res_name
+
+    pdb = pdb if pdb else None
+    model = int(model) if model else None
+    chain = chain if chain else None
+    res = int(res) if res else None
+    name = name if name else None
+
+    return (pdb, model, chain, res, name)
 
 
-def dump(residue_list, io):
+def dump(residue_list, io, **kwargs):
     for residue in residue_list:
         res_id = write_residue_id(residue)
         print(res_id, file=io)
 
 
-def loadi(io):
+def loadi(io, **kwargs):
     for line in io:
         line = line.strip()
         tokens = map(str.strip, line.split('#'))
@@ -44,7 +65,7 @@ def loadi(io):
         yield res_id
 
 
-def load(io):
+def load(io, **kwargs):
     return list(loadi(io))
 
 
@@ -86,7 +107,7 @@ def load_with_structure(io, structure, ignore_missing=False):
 
 
 def dumps(pointlist, **kwargs):
-    buf = StringIO()
+    buf = moves.StringIO()
     dump(pointlist, buf, **kwargs)
     return buf.getvalue()
 

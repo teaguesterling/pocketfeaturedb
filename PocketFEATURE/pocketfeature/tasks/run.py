@@ -1,5 +1,11 @@
 #!/usr/bin/env python
-from __future__ import print_function
+from __future__ import absolute_import, print_function
+
+from taskbase import (
+    Task,
+    TaskFailure,
+    use_file,
+)
 
 import csv
 import logging
@@ -9,44 +15,93 @@ from feature.io import (
     pointfile,
 )
 from feature.io.common import open_compressed
-
-from pocketfeature.datastructs import NORMALIZED_SCORE
-
 from pocketfeature.io import (
     backgroundfile,
     featurefile,
     matrixvaluesfile,
     pdbfile,
 )
-from pocketfeature.tasks.extract import (
-    create_pocket_around_ligand,
-    find_one_of_ligand_in_structure,
-    focus_structure,
-    pick_best_ligand,
-)
-from pocketfeature.tasks.align import (
-    AlignScores,
-    align_scores,
-)
-from pocketfeature.tasks.compare import Compare
-from pocketfeature.tasks.featurize import (
-    featurize_points,
-    update_environ_from_namespace,
-)
-from pocketfeature.tasks.rmsd import compute_alignment_rmsd
-from pocketfeature.tasks.visualize import create_alignment_visualizations
-from pocketfeature.utils.args import LOG_LEVELS
-from pocketfeature.utils.pdb import guess_pdbid_from_stream
-from pocketfeature.utils.ff import get_pocket_signature
-from pocketfeature.tasks.core import Task
 
-#!/usr/bin/env python
-from __future__ import absolute_import
-
-from taskbase import Task
+from .extract import PocketExtraction
+from .featurize import FeaturizePoints
+from .compare import FeatureFileComparison
+from .align import ScoreAlignment
+from .rmsd import AlignmentRmsdComputation
 
 
+class BaseTask(Task):
 
+    def setup(self, params=None, **kwargs):
+        params = params or self.params
+        defaults = self.defaults(**self.conf)
+        self.setup_task(params, defaults=defaults, **kwargs)
+        self.setup_params(params, defaults=defaults, **kwargs)
+        self.setup_inputs(params, defaults=defaults, **kwargs)
+
+    def load_inputs(self):
+        pass
+
+    def prepare_subtasks(self):
+        #TODO Finish parameter mapping
+        self.subtask_pick_pocketA = PocketExtraction.create_subtask(self, tag='pocketA')
+        self.subtask_pick_pocketB = PocketExtraction.create_subtask(self, tag='pocketB')
+
+        self.subtask_featurizeA = FeaturizePoints.create_subtask(self, tag='pocketA')
+        self.subtask_featurizeB = FeaturizePoints.create_subtask(self, tag='pocketB')
+
+        self.subtask_compare_features = FeatureFileComparison.create_subtask(self)
+        self.subtask_align_scores = ScoreAlignment.create_subtask(self)
+
+        self.subtask_alignment_rmsd = AlignmentRmsdComputation(self)
+
+    def execute(self):
+        pass
+
+    def produce_results(self):
+        pass
+
+    def setup_params(self, params, defaults=None, **kwargs):
+        pass
+
+    def setup_inputs(self, params, defaults=None, **kwargs):
+        pass
+
+    @classmethod
+    def parser(cls, stdin, stdout, stderr, environ, task_name):
+        from argparse import ArgumentParser
+        parser = ArgumentParser(prog=task_name,
+                                description="")
+        return parser
+
+    @classmethod
+    def arguments(cls, parser, stdin, stdout, stderr, environ, **kwargs):
+        cls.input_arguments(parser, stdin, stdout, stderr, environ, **kwargs)
+        cls.task_arguments(parser, stdin, stdout, stderr, environ, **kwargs)
+        cls.parameter_arguments(parser, stdin, stdout, stderr, environ, **kwargs)
+
+    @classmethod
+    def defaults(cls, stdin, stdout, stderr, environ, **kwargs):
+        defaults = super(BaseTask, cls).defaults(stdin, stdout, stderr, environ, **kwargs)
+        defaults.update(cls.paremeter_defaults(stdin, stdout, stderr, environ, **kwargs))
+        return defaults
+
+    @classmethod
+    def parameter_arguments(cls, parser, stdin, stdout, stderr, environ, **kwargs):
+        pass
+
+    @classmethod
+    def input_arguments(cls, parser, stdin, stdout, stderr, environ, **kwargs):
+        pass
+
+
+    @classmethod
+    def paremeter_defaults(cls, stdin, stdout, stderr, environ, **kwargs):
+        return {}
+
+
+if __name__ == '__main__':
+    import sys
+    sys.exit(BaseTask.run_as_script())
 
 
 def load_points(pdb_file,

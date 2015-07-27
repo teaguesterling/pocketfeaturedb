@@ -7,6 +7,7 @@ from .compressed import (
     decompress,
     is_normal_file,
     open_compressed,
+    use_file,
 )
 from .core import Task
 from .parallel import ensure_all_imap_unordered_results_finish
