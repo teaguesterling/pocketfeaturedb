@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<link rel="shortcut icon" href="img/FVlogo7Icon.ico" type="image/x-icon" />
+<title>FEATUREViz</title>
+<style type="text/css">
+@import "css/overcast/jquery-ui-1.10.4.custom.min.css";
+@import "css/bootstrap/css/bootstrap.min.css";
+@import "css/spectrum.css";
+@media only screen and (min-width: 1150px) /*and (max-height: 630px) */{
+    #vizTools {
+        width: 275px;
+    }
+    #alignmentTable div.colorBall {
+        width: 14px;
+        height: 14px;
+    }
+    #alignmentTable div.colorBall span.arrow {
+        margin-left: 13px;
+    }
+    #vizCanvas {
+        padding-right: 310px;
+    }
+}
+@media only screen and (max-width: 1150px) /*and (max-height: 630px) */{
+    /* rules that only apply for canvases narrower than 1150px and shorter than 550px */
+    #vizTools {
+        width: 225px;
+        font-size: 80%;
+    }
+    #alignmentTable div.colorBall {
+        height: 10px;
+        width: 10px;
+    }
+    #alignmentTable div.colorBall span.arrow {
+        margin-left: 9px;
+    }
+    #vizTools .display-options {
+        zoom: 0.75;
+        font-size: 100%;
+    }
+    nav {
+        zoom: 0.75;
+    }
+    #vizCanvas {
+        padding-right: 260px;
+        zoom: 0.75;
+    }
+}
+/*@media only screen and (max-width: 1150px) and (min-height: 630px) {*/
+    /* rules that only apply for canvases narrower than 1150px and taller than 550px */
+    /*#vizCanvas {*/
+        /*zoom: 0.9;*/
+    /*}*/
+/*}*/
+
+body {
+    padding-top: 70px;
+    overflow: hidden;
+}
+
+div.featureVizContainer {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}
+
+hr {
+    margin-bottom: 0;
+}
+
+h4 {
+    clear: both;
+    margin-left: 8px;
+}
+
+nav .logo {
+    height: 40px;
+    margin: -10px 0 0 -10px;
+}
+nav.navbar {
+    z-index: 1001;
+}
+
+.navbar-header .navbar-brand {
+    font-size: 32px;
+}
+
+div.ui-slider-horizontal {
+    /* todo: set back to 11px on mobile devices */
+    margin-top: 15px;
+    /*margin-top: 11px;*/
+    /* todo: set back to .8em on mobile devices */
+    height: 0.4em;
+}
+
+div.ui-slider-horizontal .ui-slider-handle {
+    /* todo: set back to -0.3em on mobile devices */
+    top: -.5em;
+}
+
+.ui-slider-handle {
+    outline: none;
+}
+
+#vizCanvas.rendered {
+    opacity: 1;
+}
+#vizCanvas {
+    opacity: 0;
+    -moz-transition: opacity 1s;
+    -webkit-transition: opacity 1s;
+    -o-transition: opacity 1s;
+    transition: opacity 1s;
+    width: 100%;
+}
+
+#vizGrid {
+    width: 770px;
+    margin: auto;
+}
+
+#vizGrid .syncButton {
+    font-size: large;
+}
+
+#alignmentGrid {
+    clear: both;
+    overflow-x: auto;
+    overflow-y: visible;
+}
+
+.vizBody.locked {
+    border-color: #454545;
+}
+
+.vizBody {
+    border: 1px solid #DEDEDE;
+}
+
+.vizContainer {
+    float: left;
+    margin: 0 20px 20px 20px;
+}
+
+.centerButtonsContainer {
+    float: left;
+    margin-top: 275px;
+}
+
+td.toggleVisibility span.glyphicon {
+    padding: 3px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+td.toggleVisibility span.glyphicon {
+    color: #999;
+}
+
+td.toggleVisibility.withinCutoff span.glyphicon {
+    color: inherit;
+}
+
+td.toggleVisibility.withinCutoff:focus span.glyphicon, td.toggleVisibility.withinCutoff:hover span.glyphicon {
+    border-color: #ddd;
+    -webkit-box-shadow: inset 0 0 2px #ddd;
+    -moz-box-shadow: inset 0 0 2px #ddd;
+    box-shadow: inset 0 0 2px #ddd;
+    cursor: pointer;
+}
+
+#alignmentTable table.table-condensed td {
+    padding: 3px;
+}
+
+#alignmentTable {
+    margin: 0 5px 10px 5px;
+    max-height: 400px;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+#alignmentTable table {
+    width: 100%;
+}
+
+#alignmentTable th {
+    max-width: 150px;
+}
+
+#alignmentTable th.colorSchemePicker {
+    padding-left: 10px;
+    cursor: pointer;
+}
+
+.colorSchemePicker .popover{
+    font-weight: normal;
+    cursor: inherit;
+}
+
+.ramp.selected {
+    background-color: #999;
+}
+
+.ramp:hover {
+    background-color: #ccc;
+}
+
+.ramp {
+    float: left;
+    padding: 5px 5px 0 5px;
+    cursor: pointer;
+}
+
+#alignmentTable td.colorBall div.colorBall-container {
+    padding: 1px 10px 3px 3px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    margin-top: 1px;
+}
+
+#alignmentTable td.colorBall.withinCutoff:hover div.colorBall-container {
+    border-color: #ddd;
+    -webkit-box-shadow: inset 0 0 2px #ddd;
+    -moz-box-shadow: inset 0 0 2px #ddd;
+    box-shadow: inset 0 0 2px #ddd;
+    cursor: pointer;
+}
+
+#alignmentTable div.colorBall span.arrow {
+    color: #999;
+    font-size: 7pt;
+    vertical-align: top;
+}
+#alignmentTable div.colorBall {
+    border: 1px solid #999;
+    border-radius: 7px;
+    margin-top: 2px;
+}
+
+#alignmentTable tbody tr {
+    cursor: default;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+#alignmentTable tbody tr td.colorBall {
+    border-right: 1px solid #ddd;
+}
+
+#alignmentTable tbody tr td.noHoverHighlight {
+    background-color: transparent;
+}
+
+#alignmentTable tbody tr td input[type="checkbox"] {
+    margin-top: -11px;
+}
+
+#alignmentTable td.colorBall {
+    padding-right: 10px !important;
+}
+
+#alignmentTable div.colorBall span:hover {
+    visibility: visible;
+}
+
+#vizTools.rendered {
+    opacity: 1;
+}
+#vizTools {
+    background-color: #fcfcfc;
+    border-left: 1px solid #e5e5e5;
+    box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: scroll;
+    padding-top: 50px;
+    padding-bottom: 10px;
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    opacity: 0;
+    -moz-transition: all 0.4s;
+    -webkit-transition: all 0.4s;
+    -o-transition: all 0.4s;
+    transition: all 0.4s;
+    z-index: 1000;
+    /* fix for safari font flicker bug */
+    -webkit-font-smoothing: antialiased;
+}
+
+table.alignmentTable {
+    width: 800px;
+    margin: auto;
+    text-align: center;
+    font-size: larger;
+    border-radius: 5px;
+}
+
+#vizTools button {
+    -webkit-font-smoothing: antialiased
+}
+#vizTools span.control-label {
+    padding-right: 0;
+}
+
+div#scoreCutoffSlider div.sliderTooltip, div.scoreCutoffSlider div.sliderTooltip {
+    left: -1.9em;
+}
+
+/* Fix display Options Width */
+.proteinDisplayOptions {
+    margin: 0 auto;
+}
+
+div.ligandRenderingTools .row .col {
+    padding-left: 5px;
+    padding-right: 25px;
+}
+
+#ligandDisplayOptions table {
+    margin: 0 auto;
+}
+
+#ligandDisplayOptions table .atomName {
+    color: transparent;
+}
+
+#ligandDisplayOptions .ui-button-text-only .ui-button-text, .proteinDisplayOptions .ui-button-text-only .ui-button-text {
+    padding: 0.25em .2em;
+}
+
+div.proteinDisplayOptions table {
+    margin: 0 10px;
+}
+.display-options table .atomName {
+    display: none;
+}
+
+
+#hqButton {
+    /* todo: better selector please */
+    margin-left: 20px;
+}
+
+/* Fix bootstrap css issue */
+.form-group {
+    margin-right: 0 !important;
+}
+
+/* jquery double slider middle */
+.ui-slider .ui-slider-range {
+    background-image: repeating-linear-gradient(90deg, #3383bb, #79BDEC, #ddd);
+}
+
+/* jquery slider active handle color */
+.ui-state-active, .ui-widget-content .ui-state-active, .ui-widget-header .ui-state-active {
+    color: #3383bb !important;
+}
+
+div.ui-slider span.handlerText {
+    color: #999;
+    font-size: 13px;
+    width: 100%;
+    text-align: center;
+    display: block;
+}
+
+div.save-restore-buttons button.highlightOnComplete {
+    background-color: inherit;
+    -moz-transition: all 0.25s;
+    -webkit-transition: all 0.25s;
+    -o-transition: all 0.25s;
+    transition: all 0.25s;
+}
+
+div.save-restore-buttons button.complete {
+    background-color: #428bca;
+    border-color: #357ebd;
+    color: white;
+}
+div.save-restore-buttons button.error {
+    background-color: #d9534f;
+    border-color: #d43f3a;
+    color: white;
+}
+
+.poseMenu {
+    max-width: 500px;
+    max-height: 600px;
+    overflow: auto;
+}
+.poseMenu li input {
+    /*pointer-events: none;*/
+}
+.poseMenu li .editItem {
+    display: none;
+}
+.poseMenu li.edit .editItem {
+    display: block;
+}
+.poseMenu li.edit .viewItem {
+    display: none;
+}
+.poseMenu li .btn-group-vertical:hover {
+    opacity: 1;
+}
+.poseMenu li .btn-group-vertical {
+    opacity: 0.5;
+    position: absolute;
+    right: 2px;
+    top: -3px;
+}
+.poseMenu li .btn-group-vertical .btn  {
+    font-size: 10px;
+}
+.poseMenu li {
+    position: relative;
+    margin-top: 3px;
+    padding: 5px 30px 5px 5px;
+}
+.poseMenu li input {
+    font-size: 15px;
+}
+.poseMenu li a {
+    font-size: 16px;
+    padding-left: 2px;
+    padding-right: 2px;
+}
+.poseMenu div.confirmationDialog {
+    background-color: #fff;
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    height: 101%;
+    width: 100%;
+    margin: 3px auto;
+    text-align: center;
+    z-index: 5000;
+}
+.poseMenu .confirmationDialog div.btn-group {
+    background-color: inherit;
+    right: 0;
+}
+.poseMenu .confirmationDialog.hidden div.btn-group {
+    position: absolute;
+    right: 400px;
+    -moz-transition: right 0.25s;
+    -webkit-transition: right 0.25s;
+    -o-transition: right 0.25s;
+    transition: right 0.25s;
+}
+/* hide all buttons and inputs in pose list for now */
+.poseMenu li input, .poseMenu .btn-group {
+    /*display: none;*/
+}
+/* don't show the link or the edit button while editing */
+/*.poseMenu li.edit a, .poseMenu li.edit .editButton, .poseMenu li.edit:hover a, .poseMenu li.edit:hover .editButton {*/
+    /*display: none;*/
+/*}*/
+/* don't show the input, savebutton or cancel buttons while not editing */
+/*.poseMenu li input, .poseMenu li .saveButton, .poseMenu li .cancelButton {*/
+    /*display: none;*/
+/*}*/
+/*.poseMenu li.edit input {*/
+    /*display: block;*/
+/*}*/
+/*.poseMenu li.edit .saveButton, .poseMenu li .editButton {*/
+    /*position: absolute;*/
+    /*top: 5px;*/
+    /*right: 5px;*/
+/*}*/
+
+/*table.alignmentTable, div.vizBody {*/
+/*transition: all 0.5s ease-in-out;*/
+/*perspective: 800px;*/
+/*perspective-origin: 50% 100px;*/
+/*}*/
+/*table.alignmentTable:hover, div.vizContainer:hover div.vizBody {*/
+/*transform: rotateY(180deg);*/
+/*}*/
+#importModal .modal-body .dragDropInstructions {
+    text-align: left;
+    margin-top: 20px;
+}
+#importModal .modal-body {
+    text-align: center;
+}
+div.dragDropZone * {
+    pointer-events: none;
+}
+
+div.dragDropZone h1 {
+    margin: 10px 0 0 0;
+}
+
+div.dragDropZone.error .errorMessage {
+    display: block;
+    font-size: 20px;
+    line-height: 2em;
+}
+div.dragDropZone .errorMessage {
+    display: none;
+}
+div.dragDropZone.error .glyphicon {
+    color: #c9302c;
+}
+
+div.dragDropZone.loaded .glyphicon {
+    color: #449d44;
+}
+div.dragDropZone .errorMessage .glyphicon {
+    font-size: inherit;
+}
+div.dragDropZone .glyphicon {
+    font-size: 84px;
+    -webkit-transition: all .2s;
+    transition: all .2s;
+    margin-top: 10px;
+    color: #3383bb;
+}
+
+div.dragDropZone:hover, div.dragDropZone.hover {
+    background-color: #f4f4f4;
+}
+
+div.dragDropZone:hover .glyphicon-upload, div.dragDropZone.hover .glyphicon-upload {
+    color: #449d44;
+}
+
+div.dragDropZone.loaded .hideOnLoad {
+    display: none;
+}
+
+div.dragDropZone.loaded .showOnLoad {
+    display: inherit;
+}
+
+div.dragDropZone .showOnLoad {
+    display: none;
+}
+
+div.dragDropZone {
+    text-align: center;
+    border: dashed 3px #C1C3C5;
+    margin: 10px 20px;
+    min-height: 200px;
+    cursor: pointer;
+}
+
+</style>
+<script data-main="js/main" src="js/lib/require.js"></script>
+</head>
+<body>
+<div id="importModal" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog"
+     aria-labelledby="myLargeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span
+                        class="sr-only">Close</span></button>
+                <h3 class="modal-title" id="myModalLabel"><span class="glyphicon glyphicon-folder-open"></span>&nbsp;&nbsp;Open Workbook</h3>
+            </div>
+            <div class="modal-body">
+                <p class="lead welcomeMessage">Welcome to FEATUREViz! If you're just exploring the app, read about PocketFEATURE on the <a href="https://simtk.org/home/pocketfeature" target="_blank">project page <span class="glyphicon glyphicon-new-window small"></span> </a> and then check out an example to compare two binding sites:</p>
+
+                <div class="btn-group">
+                    <button type="button" class="btn btn-default dropdown-toggle btn-lg" data-toggle="dropdown"> Example Alignments <span class="caret"></span></button>
+                    <ul class="dropdown-menu" role="menu" id="exampleMenu">
+                        <li><a class='exampleLink' href="./examples/1qrd-1qrd2.zip">Identical Alignment (1qrd-1qrd)</a></li>
+                        <li><a class='exampleLink' href="./examples/1qrd-1qhx.zip">Easy Alignment (1qrd-1qhx)</a></li>
+                        <li><a class='exampleLink' href="./examples/1A6E-1GTR.zip">Difficult Alignment A (1A6E-1GTR)</a></li>
+                        <li><a class='exampleLink' href="./examples/1CZA-1PDA.zip">Difficult Alignment B (1CZA-1PDA)</a></li>
+                    </ul>
+                </div>
+
+                <p class="lead clearfix dragDropInstructions">Otherwise, load an output file from PocketFEATURE or a FEATUREViz Workbook to visualize it. Just drag it in to the box
+                    below or click the box to find the file.</p>
+                <input type="file" class="fileselect" name="fileselect[]"
+                       style="position: fixed; top: -30px; height: 0; width: 0;"/>
+
+                <div class="dragDropZone">
+                    <h1 class="hideOnLoad">Drop file in here</h1>
+
+                    <h1 class="showOnLoad">Loading file</h1>
+                    <span class="h2"><small class="hideOnLoad">(or click to pick manually)</small></span>
+                    <br/>
+                    <span class="glyphicon glyphicon-upload hideOnLoad"></span>
+                    <span class="glyphicon glyphicon-ok-circle showOnLoad"></span>
+                    <span class="h2"><small class="hideOnLoad errorMessage text-danger bg-danger"><span class="glyphicon glyphicon-exclamation-sign"></span> An error occured while reading the file. Please double check it and try again.</small></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="saveModal" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog"
+     aria-labelledby="myLargeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span
+                        class="sr-only">Close</span></button>
+                <h3 class="modal-title"><span class="glyphicon glyphicon-floppy-save"></span> Save Workbook</h3>
+            </div>
+            <div class="modal-body">
+                <p class="lead">A FEATUREViz workbook contains your <mark><u>alignment data</u></mark>
+                    along with everything you see in FEATUREViz. That includes your list of
+                    <mark><u>poses</u></mark>, <mark><u>ball rendering</u></mark> options,
+                    <mark><u>ligand rendering</u></mark> options, and <mark><u>molecule rendering</u></mark> options.
+                </p>
+                <form role="form">
+                    <div class="form-group form-group-lg">
+                        <label for="workbookNameInput">Save workbook as:</label>
+                        <input type="text" class="form-control input-lg workbookName" id="workbookNameInput"
+                               placeholder="Enter workbook name">
+                        <span class="help-block">The workbook filename will be of the form workbookName-mol1-mol2.zip</span>
+                    </div>
+                    <button type="button" class="saveWorkBookButton btn btn-primary btn-lg"><span
+                            class="glyphicon glyphicon-floppy-save"></span> Save Workbook
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="imageModal" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog"
+     aria-labelledby="myLargeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span
+                        class="sr-only">Close</span></button>
+                <h3 class="modal-title"><span class="glyphicon glyphicon-camera"></span> Save Images</h3>
+            </div>
+            <div class="modal-body">
+                <div class="progress hidden">
+                    <div class="progress-bar progress-bar-success complete" style="width: 0">
+                        <span class="sr-only">Complete (success)</span>
+                    </div>
+                    <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="100"
+                         aria-valuemin="0" aria-valuemax="100" style="width: 50%">
+                        <span class="sr-only">Rendering</span>
+                    </div>
+                </div>
+                <div class="moleculeSelectButtons">
+                </div>
+
+                <button type="button" class="saveImagesButton btn btn-primary btn-lg">
+                    <span class="glyphicon glyphicon-camera"></span>  Save Images
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<nav class="navbar navbar-default navbar-fixed-top" role="navigation">
+    <div class="container">
+        <div class="navbar-header">
+            <span class="navbar-brand"><img src="img/FVlogo4.png" class="logo"/> FEATUREViz</span>
+
+        </div>
+
+        <div class="btn-group navbar-right">
+            <button type="button" class="btn btn-default navbar-btn" data-toggle="modal" data-target="#importModal">
+                <span class="glyphicon glyphicon-folder-open"></span>&nbsp;&nbsp;Open Workbook
+            </button>
+            <button id="exportButton" type="button" class="btn btn-default navbar-btn disabled" data-toggle="modal"
+                    data-target="#saveModal"><span class="glyphicon glyphicon-floppy-save"></span> Save Workbook
+            </button>
+            <button id="imageButton" type="button" class="btn btn-default navbar-btn disabled" data-toggle="modal" data-target="#imageModal"><span
+                    class="glyphicon glyphicon-camera"></span> Save Images
+            </button>
+        </div>
+    </div>
+</nav>
+<div id="featureVizContainer" class="featureVizContainer">
+<div id="vizCanvas">
+    <div id="errorMessages" class="alert alert-danger hidden" role="alert"></div>
+    <div class="save-restore-buttons text-center">
+        <div class="btn-group">
+            <button id="savePoseButton" type="button" class="btn btn-default highlightOnComplete"><span
+                    class="glyphicon glyphicon-plus-sign"></span> Save Pose
+            </button>
+            <div class="btn-group poseDropDown">
+                <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span
+                        class="glyphicon glyphicon-repeat"></span> Restore Pose <span class="caret"></span></button>
+                <ul class="dropdown-menu poseMenu" role="menu">
+                </ul>
+            </div>
+            <button id="autoPoseButton" type="button" class="btn btn-default highlightOnComplete"><span
+                    class="glyphicon glyphicon-flash"></span> Auto Pose
+            </button>
+        </div>
+        <span class="glyphicon glyphicon-info-sign autoPoseInfo"></span>
+    </div>
+    <div id="vizGrid"></div>
+    <div id="alignmentGrid"></div>
+</div>
+<div id="vizTools">
+    <h4>Ball Rendering</h4>
+
+    <div id="alignmentTable"></div>
+    <div class="form-horizontal">
+        <div class="form-group">
+            <span class="col-sm-4 control-label">Score Cutoff</span>
+
+            <div class="col-sm-8">
+                <div id="scoreCutoffSlider"></div>
+            </div>
+        </div>
+        <div class="form-group">
+            <span class="col-sm-4 control-label">Ball Scale</span>
+
+            <div class="col-sm-8">
+                <div id="ballScaleSlider"></div>
+            </div>
+        </div>
+
+    </div>
+    <hr>
+    <div class="bs-callout bs-callout-info ligandRenderingTools">
+        <h4>Ligand Rendering</h4>
+        <div class="row">
+            <div class="col col-sm-8 col-sm-offset-4">
+                <div id="ligandDisplayOptions"></div>
+            </div>
+        </div>
+        <div class="form-horizontal">
+            <div class="form-group">
+                <span class="col-sm-4 control-label">Diameter</span>
+
+                <div class="col-sm-8">
+                    <div id="ligandDiameterSlider"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <hr>
+    <div class="moleculeRenderingTools">
+        <h4>Molecule Rendering</h4>
+        <div class="proteinDisplayOptions"></div>
+        <div class="form-horizontal">
+            <div class="form-group">
+                <span class="col-sm-4 control-label">Slab & Fog</span>
+
+                <div class="col-sm-8">
+                    <div class="proteinZShadeSlider"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <hr>
+    <div>
+        <h4>Quality Rendering</h4>
+        <button id="hqButton" type="button" class="btn btn-default btn-xs hqButton">High Quality (anti-aliasing)
+        </button>
+    </div>
+</div>
+</div>
+</body>
+</html>
